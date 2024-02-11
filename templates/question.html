@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nächste Frage</title>
+  <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0; /* Reset default margin */
+        display: flex;
+        justify-content: center; /* Center horizontally */
+        align-items: center; /* Center vertically */
+        min-height: 100vh; /* Ensure full viewport height */
+      }
+      
+      .container {
+        max-width: 600px;
+        text-align: center;
+      }
+      
+      input[type="text"] {
+        width: calc(100% - 20px); /* Adjust width */
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      
+      input[type="submit"] {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        cursor: pointer;
+        margin-bottom: 10px;
+      }
+      
+      input[type="submit"]:hover {
+        background-color: #45a049;
+      }
+      
+      .links {
+        margin-top: 20px;
+        text-align: center;
+      }
+      
+      .links a {
+        margin: 0 10px;
+        text-decoration: none;
+        color: #007bff;
+      }
+      
+      .examples_container {
+        text-align: left;
+      }
+      .item {
+          margin-bottom: 10px; /* Add space between items */
+      }
+      .italic {
+          font-style: italic;
+      }
+  </style>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <p>Was bedeutet {{ entry["word"] }}?</p>
+    <form id="quizForm">
+      <input type="text" id="answer" placeholder="Deine Antwort...">
+      <input type="submit" value="Submit">
+    </form>
+    <div class="links">
+      <a href="/next_question">Next</a>
+      <a href="/exit">Exit</a>
+    </div>
+    <div id="result" style="display: none;">
+      <p id="scorePara"> </p>
+      <h3>Echte Antwort: {{ entry["translation"] }}</h3>
+      <div class="examples_container">
+        {% for item in entry['examples'] %}
+            <div class="item">
+                <div>{{ loop.index }}. {{ item[0] }}</div>
+                <div class="italic">{{ item[1] }}</div>
+            </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('quizForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // Display the additional text when the form is submitted
+      document.getElementById('result').style.display = 'block';
+
+      var answer = document.getElementById('answer').value;
+      if (answer.length == 0) {
+        return;
+      }
+      var translation = "{{ entry['translation'] }}"
+      // Get score
+      $.ajax({
+        url: '/answer_score?answer=' + answer + "&translation=" + translation,
+        type: 'GET',
+        success: function(response) {
+            score_string = "Deine Antwort ist " + response.score_string + 
+              ", Ähnlichkeitwert " + response.score
+            $('#scorePara').text(score_string);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error:', error);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+
