@@ -1,2 +1,2 @@
 # spiel
-Mein eigenes Deutsches Vokabeln Spiel
+Mein eigenes Deutsches Vokabeln Spiel - http://bit.ly/jein
