@@ -69,10 +69,12 @@
       <input type="text" id="answer" placeholder="Deine Antwort...">
       <input type="submit" value="Submit">
     </form>
-    <div class="links">
+
+    <div id="toplinks" class="links" style="display: none;">
       <a href="/next_question">Next</a>
-      <a href="/exit">Exit</a>
+      <a href="/exit" class="exit-link">Exit</a>
     </div>
+
     <div id="result" style="display: none;">
       <p id="scorePara"> </p>
       <h3>Echte Antwort: {{ entry["translation"] }}</h3>
@@ -85,17 +87,26 @@
         {% endfor %}
       </div>
     </div>
+
+    <div class="links">
+      <a href="/next_question">Next</a>
+      <a href="/exit" class="exit-link">Exit</a>
+    </div>
   </div>
 
+  <script src="{{url_for('static', filename='js/question.js')}}"></script>
   <script>
     document.getElementById('quizForm').addEventListener('submit', function(e) {
       e.preventDefault();
-
+  
       // Display the additional text when the form is submitted
       document.getElementById('result').style.display = 'block';
-
+      document.getElementById('toplinks').style.display = 'block';
+  
+      var word = "{{ entry['word'] }}"
       var answer = document.getElementById('answer').value;
       if (answer.length == 0) {
+        updateWordScore(word, 0);
         return;
       }
       var translation = "{{ entry['translation'] }}"
@@ -107,12 +118,13 @@
             score_string = "Deine Antwort ist " + response.score_string + 
               ", Ähnlichkeitwert " + response.score
             $('#scorePara').text(score_string);
+            updateWordScore(word, response.score);
         },
         error: function(xhr, status, error) {
             console.error('Error:', error);
         }
       });
-    });
+  });
   </script>
 </body>
 </html>

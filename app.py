@@ -12,7 +12,6 @@ next_entry = spiel.get_next_entry()
 
 def create_app():
     app = Flask(__name__)
-    app.secret_key = 'your_secret_key_here'
 
     app.config.from_mapping(
         DEEPL_KEY = os.environ.get("DEEPL_KEY")
