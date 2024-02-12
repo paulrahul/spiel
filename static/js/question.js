@@ -3,7 +3,8 @@ let basicScores = new Map();
 
 // Function to save data to localStorage
 function saveDataToLocalStorage() {
-    localStorage.setItem('basicScores', JSON.stringify(Array.from(basicScores.entries())));
+    localStorage.setItem('basicScores',
+        JSON.stringify(Array.from(basicScores.entries())));
     console.log('Data saved to localStorage.');
 }
 

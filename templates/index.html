@@ -29,6 +29,7 @@
             margin-right: 10px; /* add space between links */
         }
     </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
     <div id="main-text">
@@ -39,8 +40,34 @@
         </p>
     </div>
     <div>
-        <a id="play-link" href="/play">Play</a>
+        <a id="play-link" href="#" onclick="handlePlayClick()">Play</a>
         <!--a id="reload-link" href="/reload">Reload</a-->
     </div>
+
+    <script>
+        function handlePlayClick() {
+            let storedData = localStorage.getItem('basicScores');
+            if (storedData) {
+                $.ajax({
+                    url: '/seed_scores',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: storedData,
+                    success: function(response) {
+                        console.log('Scores seeded');
+                        // Do something with the response if needed
+                        window.location.href = response.redirect_url;
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                    }
+                });
+            } else {
+                console.log('No scores found in local storage.')
+                window.location.href = 'play';
+            }        
+        }
+
+    </script>
 </body>
 </html>

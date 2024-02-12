@@ -64,7 +64,12 @@
 </head>
 <body>
   <div class="container">
-    <p>Was bedeutet {{ entry["word"] }}?</p>
+    {% if entry["de_to_en"] %}
+      <p>Was bedeutet {{ entry["word"] }}?</p>
+    {% else %}
+      <p>Was ist das Deutche Wort für {{ entry["word"] }}?</p>
+    {% endif %}
+
     <form id="quizForm">
       <input type="text" id="answer" placeholder="Deine Antwort...">
       <input type="submit" value="Submit">

@@ -55,11 +55,11 @@ class DeutschesSpiel:
             logger.debug("No scores file found.")
                 
         self._prepare_game()            
-                
-    def _prepare_game(self):
+    
+    def sort_words(self, basic_scores):
         # Calculate the slope of the trend line for each word's scores
         word_slopes = {}
-        for word, scores in self._basic_scores.items():
+        for word, scores in basic_scores.items():
             x = list(range(1, len(scores) + 1))  # Assuming scores are given in chronological order
             slope, _ = polyfit(x, scores, 1)
             word_slopes[word] = slope
@@ -69,7 +69,10 @@ class DeutschesSpiel:
 
         # Print the sorted words along with their slopes
         for word in self._sorted_words:
-            logger.debug(f'{word}: {word_slopes[word]}')
+            logger.debug(f'{word}: {word_slopes[word]}')      
+                
+    def _prepare_game(self):
+        self.sort_words(self._basic_scores)
 
     def _get_next_spiel_word(self):
         n = len(self._rows)
@@ -104,11 +107,15 @@ class DeutschesSpiel:
                 index += 1
                 asked += 1
 
+    def get_scores(self):
+        return [(w, self._basic_scores[w]) for w in self._sorted_words]
+        
     def show_scores(self):
         print("SCORES")
         print("======")
-        for word in self._sorted_words:
-            print(f"{word}: {self._basic_scores[word]}")
+        sw = self.get_scores()
+        for row in sw:
+            print(f"{row[0]} -> {row[1]}")
             
     def get_next_entry(self):
         spiel_dict = {}

@@ -29,6 +29,21 @@ def create_app():
             "index.html",
             reloaded=True)
         
+    @app.route('/seed_scores', methods=['POST'])
+    def seed_scores():
+        # # Receive the data sent in the POST request
+        # data = request.json
+        
+        # # convert to map
+        # scores = {}
+        # for row in data:
+        #     scores[row[0]] = row[1]
+        
+        # # Call the Python method to process the data
+        # get_spiel().sort_words(scores)
+
+        return jsonify({'redirect_url': url_for('next_question')})
+        
     @app.route("/play")
     def play():
         return redirect(url_for('next_question'))
