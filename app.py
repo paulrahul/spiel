@@ -14,17 +14,24 @@ def create_app():
     app = Flask(__name__)
 
     app.config.from_mapping(
-        DEEPL_KEY = os.environ.get("DEEPL_KEY")
+        DEEPL_KEY = os.environ.get("DEEPL_KEY"),
+        SPIEL_MODE = os.environ.get("SPIEL_MODE")
     )
+
+    def is_prod_mode():
+        mode = app.config["SPIEL_MODE"]
+        return mode is not None and mode == "PROD"
 
     @app.route("/")
     def index():
-        return render_template("index.html")
+        return render_template(
+            "index.html",
+            prod_mode=is_prod_mode())
 
     @app.route("/reload")
     def reload():
         compiler = Compiler(app.config["DEEPL_KEY"])
-        compiler.compile(reload=True)
+        compiler.scrape_new(reload=True)
         return render_template(
             "index.html",
             reloaded=True)

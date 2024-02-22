@@ -8,12 +8,18 @@ class Parser:
     def parse_examples(self, file_name):
         pass
 
+EXAMPLE_COUNT = 5
 class DWDSParser(Parser):
     def parse_examples(self, scrape_contents):
         ret = []
+        cnt = 0
         for entry in scrape_contents:
             if "@type" in entry and entry["@type"] == "Quotation":
                 ret.append(entry["text"])
+                cnt += 1
+                
+                if cnt >= EXAMPLE_COUNT:
+                    break
                 
         return ret
     

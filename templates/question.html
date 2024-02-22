@@ -15,7 +15,7 @@
       }
       
       .container {
-        max-width: 600px;
+        max-width: 70%;
         text-align: center;
       }
       
@@ -58,6 +58,13 @@
       .italic {
           font-style: italic;
       }
+
+      .highlight {
+        padding: 2px 2px; /* Adjust padding as needed */
+        border: 1px dotted #0066cc; /* Dotted border with dark blue color */
+        background-color: #f0f0f0; /* Light gray background color */
+        color: #0066cc; /* Dark blue color for highlighted text */
+      }
   </style>
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -65,9 +72,9 @@
 <body>
   <div class="container">
     {% if entry["de_to_en"] %}
-      <p>Was bedeutet {{ entry["word"] }}?</p>
+      <p>Was bedeutet <span class="highlight">{{ entry["word"] }}</span>?</p>
     {% else %}
-      <p>Was ist das Deutche Wort für {{ entry["word"] }}?</p>
+      <p>Was ist das Deutche Wort für <span class="highlight">{{ entry["word"] }}</span>?</p>
     {% endif %}
 
     <form id="quizForm">
@@ -86,7 +93,7 @@
       <div class="examples_container">
         {% for item in entry['examples'] %}
             <div class="item">
-                <div>{{ loop.index }}. {{ item[0] }}</div>
+                <div>{{ item[0] }}</div>
                 <div class="italic">{{ item[1] }}</div>
             </div>
         {% endfor %}

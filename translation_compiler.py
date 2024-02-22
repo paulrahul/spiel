@@ -5,7 +5,6 @@ monkey.patch_all()
 from functools import partial
 import json
 import os
-import queue
 import threading
 import traceback
 
@@ -36,9 +35,10 @@ class Compiler:
         
         self._crawler = CrawlerFactory.get_crawler("dwds")
         self._translator = TranslatorFactory.get_translator("deepl", translator_api_key)
+        # self._translator = TranslatorFactory.get_translator("mock", translator_api_key)
         self._parser = ParserFactory.get_parser("dwds")
                       
-    def compile(self, reload=False):
+    def scrape_new(self, reload=False):
         # Step 1. Read word list.
         fetched = self._fetch_glossary(fetch_from_google_sheet=reload)
         if not fetched:
@@ -50,8 +50,8 @@ class Compiler:
         
         # Step 3. Scrape.
         self._scrape_and_translate()
-        
-        # Step 5.
+
+        # Step 4.
         self._cleanup()
                 
     def _cleanup(self):
@@ -100,7 +100,7 @@ class Compiler:
                 scrape_contents = json.load(file)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             logger.error(f"File {file_name} not found for parsing.")
-            return 
+            return
 
         examples = self._parser.parse_examples(scrape_contents)
         
@@ -156,16 +156,18 @@ class Compiler:
                 translation = self._translate_en_to_de(scrape_word)
                 scrape_entry["translation"] = translation
 
-                event = gevent.event.Event()
-                events.append(event)
-                greenlet = gevent.spawn(self._scrape_de_to_en, translation)
-                greenlet.name = "file"
-                greenlet.link(partial(
-                    self._post_process_scrape, 
-                    translation, scrape_entry, event))
+                # event = gevent.event.Event()
+                # events.append(event)
+                # greenlet = gevent.spawn(self._scrape_de_to_en, translation)
+                # greenlet.name = "file"
+                # greenlet.link(partial(
+                #     self._post_process_scrape, 
+                #     translation, scrape_entry, event))
                 
                           
         gevent.wait(events)
+        
+        self._translator.get_translator_call_stats()
         self._dump_metadata(to_be_scraped_queue)
         self._write_translations_to_gs(to_be_scraped_queue)
                 
@@ -177,25 +179,21 @@ class Compiler:
                 incorrect_words.append(word)
                 continue
             
-            # if not entry['de_to_en']:
-            #     continue
+            examples = entry["examples"] if entry["de_to_en"] else []
+            metadata = entry["metadata"] if entry["de_to_en"] else []
             
             dump_entries.append({
                 "word": word,
                 "de_to_en": entry["de_to_en"],
                 "translation": entry["translation"],
-                "examples": entry["examples"],
-                "metadata": entry["metadata"]
+                "examples": examples,
+                "metadata": metadata
             })
             
-        with open(DUMP_FILE_NAME, 'w') as file:
-            logger.debug(f"Dumping all metadata to file.")
-            json.dump(dump_entries, file)
+        util.append_to_file(DUMP_FILE_NAME, dump_entries)
             
-        if not len(incorrect_words) > 0:            
-            with open(INCORRECT_WORDS_FILE_NAME, 'w') as file:
-                logger.debug(f"Writing incorrect words to file.")
-                json.dump(incorrect_words, file)
+        if not len(incorrect_words) > 0:
+            util.append_to_file(INCORRECT_WORDS_FILE_NAME, incorrect_words)
                     
     def _prepare_for_scrape(self):  
         if self._gs_entries is None or len(self._gs_entries) == 0:
@@ -227,7 +225,8 @@ class Compiler:
             else:
                 word = word2
             
-            if empty_dump_file or word not in self._entries:
+            if ((empty_dump_file or word not in self._entries) or
+                (len(row) < 3 or row[2].strip() == '')):
                 to_be_scraped_queue[word] = {'de_to_en': de_to_en}
                 logger.debug(f"To be scraped: {word}, de_to_en={de_to_en}")
     
@@ -296,6 +295,10 @@ class Compiler:
             elif row[1] is not None and row[1] != '':
                 word = row[1]
                 
+            if len(row) >= 3 and row[2].strip() != '':
+                # Already has a Bedeutung filled in.
+                continue
+                
             if word not in scraped_entries:
                 logger.error(f"No translation found for {word}")
                 continue
@@ -332,7 +335,7 @@ if __name__ == "__main__":
         exit(f"The environment variable {DEEPL_KEY_VAR} is not set.")
     
     o = Compiler(api_key)
-    o.compile(reload=True)
+    o.scrape_new(reload=True)
 
     # from scraper.parser import DWDSParser    
 

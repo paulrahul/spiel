@@ -38,7 +38,7 @@ class DeutschesSpiel:
                 exit(f"The environment variable {DEEPL_KEY_VAR} is not set.")
                           
             compiler = Compiler(api_key)
-            compiler.compile(self._reload)
+            compiler.scrape_new(self._reload)
             
             if not util.file_exists(DUMP_FILE_NAME):
                 exit("No dump file found and could not create one inline.")
@@ -251,7 +251,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug logging level')
     parser.add_argument('--semantic', '-s', action='store_true', help='Enable semantic comparison')
-    parser.add_argument('--reload', action='store_true', help='Load new translations')    
+    parser.add_argument('--scrape_new', action='store_true', help='Load new translations')
     args = parser.parse_args()
 
     if args.debug:
@@ -263,7 +263,7 @@ if __name__ == "__main__":
         SemanticComparator.load()
         use_semantic = True
         
-    if args.reload:
+    if args.scrape_new:
         api_key = None
         # Check if the environment variable exists
         if DEEPL_KEY_VAR in os.environ:
@@ -273,7 +273,7 @@ if __name__ == "__main__":
             exit(f"The environment variable {DEEPL_KEY_VAR} is not set.")
                         
         compiler = Compiler(api_key)
-        compiler.compile(reload=True)
+        compiler.scrape_new(reload=True)
 
     spiel = DeutschesSpiel(use_semantic)
     if prompt('Möchtest du ein Spiel spielen?'):

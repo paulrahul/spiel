@@ -41,7 +41,9 @@
     </div>
     <div>
         <a id="play-link" href="#" onclick="handlePlayClick()">Play</a>
-        <!--a id="reload-link" href="/reload">Reload</a-->
+        {% if not prod_mode %}
+            <a id="reload-link" href="/reload">Reload</a>
+        {% endif %}
     </div>
 
     <script>
