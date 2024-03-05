@@ -1,3 +1,4 @@
 *.txt
 *.yaml
 *.pyc
+fix_dump.py

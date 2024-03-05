@@ -187,7 +187,8 @@ class Compiler:
                 "de_to_en": entry["de_to_en"],
                 "translation": entry["translation"],
                 "examples": examples,
-                "metadata": metadata
+                "metadata": metadata,
+                "synonyms": entry["synonyms"]
             })
             
         util.append_to_file(DUMP_FILE_NAME, dump_entries)
@@ -224,11 +225,18 @@ class Compiler:
                 de_to_en = True
             else:
                 word = word2
+                
+            synonyms = ""
+            if len(row) >= 4 and row[3].strip() != '':
+                synonyms = row[3].strip()
             
             if ((empty_dump_file or word not in self._entries) or
                 (len(row) < 3 or row[2].strip() == '')):
-                to_be_scraped_queue[word] = {'de_to_en': de_to_en}
-                logger.debug(f"To be scraped: {word}, de_to_en={de_to_en}")
+                to_be_scraped_queue[word] = {
+                    'de_to_en': de_to_en,
+                    'synonyms': synonyms
+                }
+                logger.debug(f"To be scraped: {word}: {to_be_scraped_queue[word]}")
     
         if len(to_be_scraped_queue) > 0:
             with open(SCRAPE_QUEUE_FILE_NAME, 'w') as file:
