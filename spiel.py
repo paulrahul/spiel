@@ -127,7 +127,7 @@ class DeutschesSpiel:
 
         while True:
             word = next(next_spiel)
-            yield spiel_dict[word] 
+            yield spiel_dict[word]
         
     def exit_game(self):
         with open(SCORE_FILE_NAME, 'w') as file:

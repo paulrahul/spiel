@@ -90,6 +90,12 @@
     <div id="result" style="display: none;">
       <p id="scorePara"> </p>
       <h3>Echte Antwort: {{ entry["translation"] }}</h3>
+
+      {% set synonyms = entry["synonyms"] %}
+      {% if synonyms != '' %}
+        <h4>Synonyme: {{ entry["synonyms"] }}</h4>
+      {% endif %}
+      
       <div class="examples_container">
         {% for item in entry['examples'] %}
             <div class="item">
