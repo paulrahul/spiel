@@ -1,5 +1,4 @@
 import deepl
-import json
 
 from log import get_logger
 

@@ -71,11 +71,17 @@
 </head>
 <body>
   <div class="container">
-    {% if entry["de_to_en"] %}
-      <p>Was bedeutet <span class="highlight">{{ entry["word"] }}</span>?</p>
-    {% else %}
-      <p>Was ist das Deutche Wort für <span class="highlight">{{ entry["word"] }}</span>?</p>
-    {% endif %}
+    <div class="stats">
+      <p id="num_questions"></p>
+    </div>
+
+    <div class="question">
+      {% if entry["de_to_en"] %}
+        <p>Was bedeutet <span class="highlight">{{ entry["word"] }}</span>?</p>
+      {% else %}
+        <p>Was ist das Deutche Wort für <span class="highlight">{{ entry["word"] }}</span>?</p>
+      {% endif %}
+    </div>
 
     <form id="quizForm">
       <input type="text" id="answer" placeholder="Deine Antwort...">
@@ -83,7 +89,7 @@
     </form>
 
     <div id="toplinks" class="links" style="display: none;">
-      <a href="/next_question">Next</a>
+      <a class="next-link">Next</a>
       <a href="/exit" class="exit-link">Exit</a>
     </div>
 
@@ -107,7 +113,7 @@
     </div>
 
     <div class="links">
-      <a href="/next_question">Next</a>
+      <a class="next-link">Next</a>
       <a href="/exit" class="exit-link">Exit</a>
     </div>
   </div>
@@ -120,6 +126,8 @@
       // Display the additional text when the form is submitted
       document.getElementById('result').style.display = 'block';
       document.getElementById('toplinks').style.display = 'block';
+      // And hide the input elements.
+      document.getElementById('quizForm').style.display = 'none';
   
       var word = "{{ entry['word'] }}"
       var answer = document.getElementById('answer').value;
