@@ -1,7 +1,9 @@
 /*********** Things to do with saving and showing basic stats ********/
 let stats = {
     num_questions: 0,
-    start_time: Date.now()
+    start_time: Date.now(),
+
+    historical_num_questions: 0
 };
 
 function updateStats() {
@@ -39,11 +41,22 @@ function loadDataFromLocalStorage() {
     let storedStats = localStorage.getItem('stats');
     if (storedStats) {
         stats = JSON.parse(storedStats);
+        if (stats.start_time == null) {
+            stats.start_time = Date.now();
+        }
     }
+}
+
+function flushStats() {
+    stats.historical_num_questions += stats.num_questions;
+    
+    stats.num_questions = 0;
+    stats.start_time = null;
 }
 
 // Function to handle clicking of the "exit" link
 function handleExitLinkClick() {
+    flushStats();
     saveDataToLocalStorage();
     console.log('Data saved to localStorage.');
 }
@@ -72,6 +85,17 @@ exitLinks.forEach(function(exitLink) {
 document.querySelectorAll('.next-link').forEach(function(nextLink) {
     nextLink.addEventListener('click', handleNextLinkClick);
 });
+
+// window.addEventListener('beforeunload', function (event) {
+//     // Cancel the event
+//     event.preventDefault();
+    
+//     // Chrome requires returnValue to be set
+//     event.returnValue = '';
+
+//     handleExitLinkClick();
+// });
+
 
 // Periodically save data every 2 minutes
 setInterval(periodicSaveData, 2 * 60 * 1000); // 2 minutes in milliseconds

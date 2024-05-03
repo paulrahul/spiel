@@ -1,4 +1,5 @@
 import os, sys
+import requests
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 from flask import Flask, session, render_template, request, url_for, jsonify
@@ -58,6 +59,17 @@ def create_app():
     @app.route("/next_question")
     def next_question():
         next_question = next(next_entry)
+        
+        try:
+            query_param = request.args.get('mode')
+            if query_param != "json":
+                raise ValueError
+            
+            data = {'next_question': next_question}
+            return jsonify(data), 200            
+        except ValueError:
+            pass
+
         return render_template(
             "question.html",
             entry=next_question)
