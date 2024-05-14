@@ -74,6 +74,20 @@ def create_app():
             "question.html",
             entry=next_question)
         
+    @app.route("/lookup")
+    def lookup():
+        try:
+            query_param = request.args.get('wort')
+            result = spiel.lookup(query_param)
+
+            return render_template(
+                "lookup.html",
+                word=query_param,
+                entry=result)        
+            
+        except ValueError:
+            pass
+        
     @app.route("/answer_score")
     def answer_score():
         user_answer = request.args.get('answer')

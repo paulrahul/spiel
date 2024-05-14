@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  {% set is_found = False %}
+  
+  {% if entry is none %}
+    <title>Dein Wort konnte nicht gefunden werden</title>
+  {% else %}
+    {% set is_found = True %}
+    <title>Dein Wort: {{ word }}</title>
+  {% endif %}
+  <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0; /* Reset default margin */
+        display: flex;
+        justify-content: center; /* Center horizontally */
+        align-items: center; /* Center vertically */
+        min-height: 100vh; /* Ensure full viewport height */
+      }
+      
+      .container {
+        max-width: 70%;
+        text-align: center;
+      }
+            
+      .links {
+        margin-top: 20px;
+        text-align: center;
+      }
+      
+      .links a {
+        margin: 0 10px;
+        text-decoration: none;
+        color: #007bff;
+      }
+      
+      .examples_container {
+        text-align: left;
+      }
+      .item {
+          margin-bottom: 10px; /* Add space between items */
+      }
+      .italic {
+          font-style: italic;
+      }
+
+      .highlight {
+        padding: 2px 2px; /* Adjust padding as needed */
+        border: 1px dotted #0066cc; /* Dotted border with dark blue color */
+        background-color: #f0f0f0; /* Light gray background color */
+        color: #0066cc; /* Dark blue color for highlighted text */
+      }
+
+      #json-container {
+        margin-top: 20px;
+        white-space: pre-wrap;   /* Wrap text */
+        word-wrap: break-word;   /* Break long words */
+        font-family: monospace;  /* Use a monospaced font for consistent spacing */
+        border: 1px solid #ccc;  /* Add a border for clarity */
+        padding: 10px;           /* Add padding for spacing */
+        overflow-x: auto;        /* Allow horizontal scrolling if needed */
+      }
+    
+      #json-container::selection {
+          background-color: #ffff66;  /* Change background color when text is selected */
+          color: #333;                /* Change text color when selected */
+      }
+
+  </style>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="question">
+      {% if not is_found %} 
+        <p>Wort {{ word }} konnte nicht gefunden werden. </p>
+      {% else %}
+        <p>Wort <span class="highlight">{{ word }}</span> bedeutet {{ entry["translation"] }}</p>
+      {% endif %}
+    </div>
+
+    <div id="toplinks" class="links">
+      <a class="raw-link" data-variable="{{ entry }}">Raw</a>
+      <a href="/next_question" class="next-link">Next</a>
+      <a href="/exit" class="exit-link">Exit</a>
+    </div>
+
+    <div id="result">
+
+      {% set synonyms = entry["synonyms"] %}
+      {% if synonyms != '' %}
+        <h4>Synonyme: {{ entry["synonyms"] }}</h4>
+      {% endif %}
+      
+      <div class="examples_container">
+        {% for item in entry['examples'] %}
+            <div class="item">
+                <div>{{ item[0] }}</div>
+                <div class="italic">{{ item[1] }}</div>
+            </div>
+        {% endfor %}
+      </div>
+
+      <div id="json-container">
+      </div>
+
+    </div>
+
+    <div class="links">
+      <a class="raw-link" data-variable="{{ entry }}">Raw</a>
+      <a href="/next_question" class="next-link">Next</a>
+      <a href="/exit" class="exit-link">Exit</a>
+    </div>
+  </div>
+
+  <script>
+
+    document.querySelectorAll('.raw-link').forEach(function(rawLink) {
+      rawLink.addEventListener('click', function(event) {
+        event.preventDefault();
+        var variableValue = this.getAttribute('data-variable');
+  
+        var jsonContainer = document.getElementById('json-container');
+        jsonContainer.innerText = variableValue;
+      });
+    });
+  </script>
+
+</body>
+</html>
+

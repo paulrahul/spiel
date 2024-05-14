@@ -18,8 +18,10 @@ class DeutschesSpiel:
         self._reload = reload
         self._use_semantic = use_semantic
         
-        self._rows = {}  #{<word>: {"de_to_en":<>, "translation":<>,...}}
-        self._basic_scores = {}  #{<word>:[90.0, 45.0,...]}
+        self._rows = {}  # {"word":<word>, "de_to_en":<>, "translation":<>,...}
+        self._spiel_dict = {} # {<word>: <original word entry>}
+        
+        self._basic_scores = {}  # {<word>:[90.0, 45.0,...]}
         
         self._sorted_words = []
 
@@ -46,6 +48,11 @@ class DeutschesSpiel:
         with open(DUMP_FILE_NAME, 'r') as file:
             logger.debug(f"Loading entries from current dump file.")
             self._rows = json.load(file)
+
+            self._spiel_dict = {}
+            for entry in self._rows:
+                word = entry["word"]
+                self._spiel_dict[word] = entry            
             
         if util.file_exists(SCORE_FILE_NAME):
             with open(SCORE_FILE_NAME, 'r') as file:
@@ -117,17 +124,18 @@ class DeutschesSpiel:
         for row in sw:
             print(f"{row[0]} -> {row[1]}")
             
+    def lookup(self, word):
+        try:
+            return self._spiel_dict[word]
+        except KeyError:
+            return None
+            
     def get_next_entry(self):
-        spiel_dict = {}
-        for entry in self._rows:
-            word = entry["word"]
-            spiel_dict[word] = entry
-        
         next_spiel = self._get_next_spiel_word()
 
         while True:
             word = next(next_spiel)
-            yield spiel_dict[word]
+            yield self._spiel_dict[word]
         
     def exit_game(self):
         with open(SCORE_FILE_NAME, 'w') as file:
