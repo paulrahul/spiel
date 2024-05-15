@@ -52,7 +52,7 @@ class DeutschesSpiel:
             self._spiel_dict = {}
             for entry in self._rows:
                 word = entry["word"]
-                self._spiel_dict[word] = entry            
+                self._spiel_dict[word.lower()] = entry            
             
         if util.file_exists(SCORE_FILE_NAME):
             with open(SCORE_FILE_NAME, 'r') as file:
@@ -125,17 +125,24 @@ class DeutschesSpiel:
             print(f"{row[0]} -> {row[1]}")
             
     def lookup(self, word):
+        word = word.lower()
         try:
             return self._spiel_dict[word]
         except KeyError:
             return None
+        
+    '''
+    Returns the full list of words.
+    '''
+    def list(self):
+        return list(self._spiel_dict.keys())
             
     def get_next_entry(self):
         next_spiel = self._get_next_spiel_word()
 
         while True:
             word = next(next_spiel)
-            yield self._spiel_dict[word]
+            yield self._spiel_dict[word.lower()]
         
     def exit_game(self):
         with open(SCORE_FILE_NAME, 'w') as file:
@@ -260,6 +267,7 @@ if __name__ == "__main__":
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug logging level')
     parser.add_argument('--semantic', '-s', action='store_true', help='Enable semantic comparison')
     parser.add_argument('--scrape_new', action='store_true', help='Load new translations')
+    parser.add_argument('--simulate', '-sm', action='store_true', help='Enable simulation mode')    
     args = parser.parse_args()
 
     if args.debug:
@@ -271,6 +279,10 @@ if __name__ == "__main__":
         SemanticComparator.load()
         use_semantic = True
         
+    simulate = args.simulate
+    if simulate:
+        logger.info("Enabled simulation mode")   
+        
     if args.scrape_new:
         api_key = None
         # Check if the environment variable exists
@@ -280,7 +292,7 @@ if __name__ == "__main__":
         else:
             exit(f"The environment variable {DEEPL_KEY_VAR} is not set.")
                         
-        compiler = Compiler(api_key)
+        compiler = Compiler(api_key, simulate)
         compiler.scrape_new(reload=True)
 
     spiel = DeutschesSpiel(use_semantic)

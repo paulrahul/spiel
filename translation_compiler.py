@@ -25,7 +25,7 @@ DEEPL_KEY_VAR = "DEEPL_KEY"
 logger = get_logger()
 
 class Compiler:
-    def __init__(self, translator_api_key):
+    def __init__(self, translator_api_key, simulation=False):
         logger.info("Starting Compiler...")
         
         self._worksheet = None
@@ -34,8 +34,13 @@ class Compiler:
         self._gs_entries = None
         
         self._crawler = CrawlerFactory.get_crawler("dwds")
-        self._translator = TranslatorFactory.get_translator("deepl", translator_api_key)
-        # self._translator = TranslatorFactory.get_translator("mock", translator_api_key)
+        
+        self._simulation = simulation
+        if self._simulation:
+            self._translator = TranslatorFactory.get_translator("mock", translator_api_key)
+        else:
+            self._translator = TranslatorFactory.get_translator("deepl", translator_api_key)
+
         self._parser = ParserFactory.get_parser("dwds")
                       
     def scrape_new(self, reload=False):
@@ -182,6 +187,8 @@ class Compiler:
             examples = entry["examples"] if entry["de_to_en"] else []
             metadata = entry["metadata"] if entry["de_to_en"] else []
             
+            logger.debug(f"Adding {word} to dump.")
+            
             dump_entries.append({
                 "word": word,
                 "de_to_en": entry["de_to_en"],
@@ -190,8 +197,9 @@ class Compiler:
                 "metadata": metadata,
                 "synonyms": entry["synonyms"]
             })
-            
-        util.append_to_file(DUMP_FILE_NAME, dump_entries)
+        
+        if not self._simulation:    
+            util.append_to_file(DUMP_FILE_NAME, dump_entries)
             
         if not len(incorrect_words) > 0:
             util.append_to_file(INCORRECT_WORDS_FILE_NAME, incorrect_words)
@@ -297,12 +305,13 @@ class Compiler:
 
         row_index = 2
         batch_updates = []
-        for row in self._gs_entries:            
+        for row in self._gs_entries:          
             if row[0] is not None and row[0] != '':
                 word = row[0]
             elif row[1] is not None and row[1] != '':
                 word = row[1]
                 
+            row_index += 1                
             if len(row) >= 3 and row[2].strip() != '':
                 # Already has a Bedeutung filled in.
                 continue
@@ -314,11 +323,13 @@ class Compiler:
             entry = scraped_entries[word]
             cell_value = entry["translation"]
 
-            batch_updates.append({
-                'range': gspread.utils.rowcol_to_a1(row_index, column_to_update),
-                'values': [[cell_value]],
-            })
-            row_index += 1            
+            logger.debug(f"Batch update writing {word} in {row_index - 1} with {cell_value}")
+
+            if not self._simulation:
+                batch_updates.append({
+                    'range': gspread.utils.rowcol_to_a1(row_index - 1, column_to_update),
+                    'values': [[cell_value]],
+                })
   
         logger.debug(f"Batch updates to be issued: {batch_updates}")
         self._worksheet.batch_update(batch_updates)

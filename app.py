@@ -1,5 +1,4 @@
 import os, sys
-import requests
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 from flask import Flask, session, render_template, request, url_for, jsonify
@@ -87,6 +86,12 @@ def create_app():
             
         except ValueError:
             pass
+        
+    @app.route("/list")
+    def list():
+        word_list = spiel.list()
+        word_list = [word.capitalize() for word in word_list]
+        return jsonify(sorted(word_list)), 200
         
     @app.route("/answer_score")
     def answer_score():

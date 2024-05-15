@@ -39,6 +39,7 @@
       }
       
       .examples_container {
+        margin-top: 20px;
         text-align: left;
       }
       .item {
@@ -53,6 +54,10 @@
         border: 1px dotted #0066cc; /* Dotted border with dark blue color */
         background-color: #f0f0f0; /* Light gray background color */
         color: #0066cc; /* Dark blue color for highlighted text */
+      }
+
+      .bedeutung {
+        font-weight: bold;
       }
 
       #json-container {
@@ -80,7 +85,7 @@
       {% if not is_found %} 
         <p>Wort {{ word }} konnte nicht gefunden werden. </p>
       {% else %}
-        <p>Wort <span class="highlight">{{ word }}</span> bedeutet {{ entry["translation"] }}</p>
+        <p>Wort <span class="highlight">{{ word }}</span> bedeutet <span class="bedeutung"> {{ entry["translation"] }} </span> </p>
       {% endif %}
     </div>
 
@@ -88,6 +93,25 @@
       <a class="raw-link" data-variable="{{ entry }}">Raw</a>
       <a href="/next_question" class="next-link">Next</a>
       <a href="/exit" class="exit-link">Exit</a>
+
+      <select name="options" id="options">
+          <!-- Placeholder option -->
+          <option value="" disabled selected>Wählst ein Wort aus</option>
+          <!-- Populate options from JSON list -->
+          <script>
+              fetch('/list')
+                  .then(response => response.json())
+                  .then(data => {
+                      data.forEach(option => {
+                          const optionElement = document.createElement('option');
+                          optionElement.value = option;
+                          optionElement.textContent = option;
+                          document.getElementById('options').appendChild(optionElement);
+                      });
+                  });
+          </script>
+        </select>
+
     </div>
 
     <div id="result">
@@ -129,6 +153,12 @@
         jsonContainer.innerText = variableValue;
       });
     });
+
+    document.getElementById('options').addEventListener('change', function() {
+      const selectedValue = this.value;
+      window.location.href = "/lookup?wort=" + selectedValue;
+    });
+
   </script>
 
 </body>
