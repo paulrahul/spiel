@@ -1,7 +1,7 @@
 import os, sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
-from flask import Flask, session, render_template, request, url_for, jsonify
+from flask import Flask, redirect, render_template, request, url_for, jsonify
 from werkzeug.utils import redirect
 
 from .spiel import DeutschesSpiel
@@ -48,8 +48,9 @@ def create_app():
         
         # # Call the Python method to process the data
         # get_spiel().sort_words(scores)
-
-        return jsonify({'redirect_url': url_for('next_question')})
+        
+        return jsonify({'redirect_url': url_for('next_question', **{"mode": "start"})})
+        # return redirect(url_for('next_question', **{"mode": "start"}))
         
     @app.route("/play")
     def play():
@@ -58,19 +59,23 @@ def create_app():
     @app.route("/next_question")
     def next_question():
         next_question = next(next_entry)
-        
+        start = False
+    
         try:
             query_param = request.args.get('mode')
-            if query_param != "json":
+            if query_param == "json":                
+                data = {'next_question': next_question}
+                return jsonify(data), 200
+            elif query_param == "start":
+                start = True
+            else:
                 raise ValueError
-            
-            data = {'next_question': next_question}
-            return jsonify(data), 200            
         except ValueError:
             pass
 
         return render_template(
             "question.html",
+            start=start,
             entry=next_question)
         
     @app.route("/lookup")

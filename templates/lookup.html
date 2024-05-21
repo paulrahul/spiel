@@ -77,10 +77,20 @@
 
   </style>
 
+  <link rel="stylesheet" href="{{url_for('static', filename='css/dark_theme_toggle.css')}}"> 
+
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
   <div class="container">
+    <div class="toggle_container">
+      <span>	&#9728; </span>
+      <label class="switch">
+        <input type="checkbox" id="toggle">
+        <span class="slider"></span>
+      </label> 
+    </div>  
+
     <div class="question">
       {% if not is_found %} 
         <p>Wort {{ word }} konnte nicht gefunden werden. </p>
@@ -142,6 +152,7 @@
     </div>
   </div>
 
+  <script src="{{url_for('static', filename='js/dark_theme_toggle.js')}}"></script>
   <script>
 
     document.querySelectorAll('.raw-link').forEach(function(rawLink) {

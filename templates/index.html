@@ -29,6 +29,9 @@
             margin-right: 10px; /* add space between links */
         }
     </style>
+
+    <link rel="stylesheet" href="{{url_for('static', filename='css/dark_theme_toggle.css')}}"> 
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
@@ -39,6 +42,14 @@
             <span id="yellow">Spiel, genau!</span>
         </p>
     </div>
+    <div class="toggle_container">
+        <span>	&#9728; </span>
+        <label class="switch">
+          <input type="checkbox" id="toggle">
+          <span class="slider"></span>
+        </label> 
+    </div>  
+
     <div>
         <a id="play-link" href="#" onclick="handlePlayClick()">Play</a>
         {% if not prod_mode %}
@@ -46,6 +57,7 @@
         {% endif %}
     </div>
 
+    <script src="{{url_for('static', filename='js/dark_theme_toggle.js')}}"></script>
     <script>
         function handlePlayClick() {
             let storedData = localStorage.getItem('basicScores');

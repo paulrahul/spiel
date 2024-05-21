@@ -6,16 +6,27 @@ let stats = {
     historical_num_questions: 0
 };
 
-function updateStats() {
-    stats.num_questions++;
+function updateStats(num_questions) {
+    stats.num_questions = num_questions;
+    displayStats();
+}
+
+function incrementStats() {
+    updateStats(stats.num_questions + 1);
 }
 
 function displayStats() {
     document.getElementById("num_questions").textContent = `${stats.num_questions} attempted`
 }
+
+function resetStats() {
+    updateStats(0);
+
+    if (stats.start_time == null) {
+        stats.start_time = Date.now();
+    }    
+}
 /*********** Things to do with saving and showing basic stats ********/
-
-
 
 // Define your map data structure
 let basicScores = new Map();
@@ -41,9 +52,6 @@ function loadDataFromLocalStorage() {
     let storedStats = localStorage.getItem('stats');
     if (storedStats) {
         stats = JSON.parse(storedStats);
-        if (stats.start_time == null) {
-            stats.start_time = Date.now();
-        }
     }
 }
 
@@ -56,14 +64,12 @@ function flushStats() {
 
 // Function to handle clicking of the "exit" link
 function handleExitLinkClick() {
-    flushStats();
+    // flushStats();
     saveDataToLocalStorage();
-    console.log('Data saved to localStorage.');
 }
 
 function handleNextLinkClick() {
-    updateStats();
-    saveDataToLocalStorage();
+    console.log("next clicked");
     window.location.href = "/next_question";
 }
 
@@ -71,10 +77,6 @@ function handleNextLinkClick() {
 function periodicSaveData() {
     saveDataToLocalStorage();
 }
-
-// Load data from localStorage when the page loads
-loadDataFromLocalStorage();
-displayStats();
 
 // Attach event listener to the "exit" link
 const exitLinks = document.querySelectorAll('.exit-link');
@@ -96,7 +98,6 @@ document.querySelectorAll('.next-link').forEach(function(nextLink) {
 //     handleExitLinkClick();
 // });
 
-
 // Periodically save data every 2 minutes
 setInterval(periodicSaveData, 2 * 60 * 1000); // 2 minutes in milliseconds
 
@@ -106,10 +107,11 @@ function updateWordScore(word, score) {
         let existingList = basicScores.get(word);
         existingList.push(score);
         basicScores.set(word, existingList); // Update the value for the key in the map
-      } else {
+    } else {
         // If the key doesn't exist, create a new list with the new value and set it as the value for the key
         basicScores.set(word, [score]);
-      }
-    console.log(basicScores);
-    handleExitLinkClick();
+    }
+
+    incrementStats();
+    saveDataToLocalStorage();
 }

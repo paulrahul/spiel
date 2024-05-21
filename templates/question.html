@@ -66,11 +66,22 @@
         color: #0066cc; /* Dark blue color for highlighted text */
       }
   </style>
+  
+  <link rel="stylesheet" href="{{url_for('static', filename='css/dark_theme_toggle.css')}}"> 
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>  
 </head>
 <body>
   <div class="container">
+    <div class="toggle_container">
+      <span>	&#9728; </span>
+      <label class="switch">
+        <input type="checkbox" id="toggle">
+        <span class="slider"></span>
+      </label> 
+    </div>  
+    <!--button id="theme-toggle">Toggle Dark Theme</button-->
+ 
     <div class="stats">
       <p id="num_questions"></p>
     </div>
@@ -119,8 +130,10 @@
     </div>
   </div>
 
-  <script src="{{url_for('static', filename='js/question.js')}}"></script>
+  <script src="{{url_for('static', filename='js/dark_theme_toggle.js')}}"></script>
+  <script src="{{url_for('static', filename='js/question.js')}}"></script>  
   <script>
+
     document.getElementById('quizForm').addEventListener('submit', function(e) {
       e.preventDefault();
   
@@ -150,8 +163,22 @@
         error: function(xhr, status, error) {
             console.error('Error:', error);
         }
-      });
-  });
+      }); // $.ajax({
+    });  // document.getElementById('quizForm').addEventListener('submit'
+
+    window.onload = function() {
+      loadDataFromLocalStorage();
+
+      // Get the value of the Flask variable passed to the template
+      var isStartMode = {{ start | tojson }};
+      
+      // Check the value of the variable and call the JavaScript method if it's set
+      if (isStartMode) {
+        resetStats();
+      } 
+      
+      displayStats();
+    }; // window.onload
   </script>
 </body>
 </html>
