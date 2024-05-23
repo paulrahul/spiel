@@ -1,7 +1,7 @@
 import os, sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
-from flask import Flask, redirect, render_template, request, url_for, jsonify
+from flask import Flask, abort, redirect, render_template, request, url_for, jsonify
 from werkzeug.utils import redirect
 
 from .spiel import DeutschesSpiel
@@ -61,17 +61,15 @@ def create_app():
         next_question = next(next_entry)
         start = False
     
-        try:
-            query_param = request.args.get('mode')
+        query_param = request.args.get('mode')
+        if query_param is not None:
             if query_param == "json":                
                 data = {'next_question': next_question}
                 return jsonify(data), 200
             elif query_param == "start":
                 start = True
             else:
-                raise ValueError
-        except ValueError:
-            pass
+                abort(400, description=f"Invalid query parameter value: {query_param}")
 
         return render_template(
             "question.html",
@@ -80,17 +78,15 @@ def create_app():
         
     @app.route("/lookup")
     def lookup():
-        try:
-            query_param = request.args.get('wort')
+        query_param = request.args.get('wort')
+        result = None
+        if query_param:
             result = spiel.lookup(query_param)
 
-            return render_template(
-                "lookup.html",
-                word=query_param,
-                entry=result)        
-            
-        except ValueError:
-            pass
+        return render_template(
+            "lookup.html",
+            word=query_param,
+            entry=result)
         
     @app.route("/list")
     def list():
