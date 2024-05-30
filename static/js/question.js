@@ -16,7 +16,7 @@ function incrementStats() {
 }
 
 function displayStats() {
-    document.getElementById("num_questions").textContent = `${stats.num_questions} attempted`
+    document.getElementById("num_questions").textContent = `${stats.num_questions} questions attempted`
 }
 
 function resetStats() {

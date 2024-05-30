@@ -21,6 +21,10 @@ class Crawler:
     def _dump_file_name(self, word):
         return self._folder_scrapes_path + "/" + word + "_json_ld.txt"
         
+    def crawl_file_exists(self, word):
+        file_name = self._dump_file_name(word)
+        return util.file_exists(file_name)
+        
     def crawl(self, word):
         pass
 
@@ -47,7 +51,7 @@ class DWDSCrawler(Crawler):
         # Step 3: Find JSON-LD script tag
         script_tags = soup.find_all('script', type='application/ld+json')
 
-        if len(script_tags) != 2:
+        if len(script_tags) < 2:
             logger.error(f"Found {len(script_tags)} in {url}")
             return None
         

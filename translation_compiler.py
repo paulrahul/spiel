@@ -146,20 +146,23 @@ class Compiler:
                 
                 greenlet1 = gevent.spawn(self._scrape_de_to_en, scrape_word)
                 greenlet1.name = "file"
-                greenlet2 = gevent.spawn(self._translate_de_to_en, scrape_word)
-                greenlet2.name = "translation"
-
                 greenlet1.link(partial(
                     self._post_process_scrape, 
                     scrape_word, scrape_entry, event))
-                greenlet2.link(partial(
-                    self._post_process_scrape,
-                    scrape_word, scrape_entry, event))
+                
+                if "translation" not in scrape_entry:                
+                    greenlet2 = gevent.spawn(self._translate_de_to_en, scrape_word)
+                    greenlet2.name = "translation"
+
+                    greenlet2.link(partial(
+                        self._post_process_scrape,
+                        scrape_word, scrape_entry, event))
             else:  # en to de
                 # First get the German translation, then do the usual scraping
-                # as is done for German words.                
-                translation = self._translate_en_to_de(scrape_word)
-                scrape_entry["translation"] = translation
+                # as is done for German words.
+                if "translation" not in scrape_entry:                            
+                    translation = self._translate_en_to_de(scrape_word)
+                    scrape_entry["translation"] = translation
 
                 # event = gevent.event.Event()
                 # events.append(event)
@@ -211,14 +214,9 @@ class Compiler:
         
         # Schedule scraping for any word in GS not having a translation.
         to_be_scraped_queue = {}
-        empty_dump_file = self._entries is None or len(self._entries) == 0
-        for row in self._gs_entries:
-            if len(row) >= 3 and row[2].strip() != '':
-                # Already has a Bedeutung filled in.
-                continue
-            
-            word1 = row[0] if len(row) > 0 and row[0].strip() != '' else None
-            word2 = row[1] if len(row) > 1 and row[1].strip() != ''  else None
+        for row in self._gs_entries:            
+            word1 = row["Deutsch"].strip() if row["Deutsch"].strip() != '' else None
+            word2 = row["Englisch"].strip() if row["Englisch"].strip() != '' else None
             
             word = None
             de_to_en = False
@@ -234,17 +232,25 @@ class Compiler:
             else:
                 word = word2
                 
+            if row["Bedeutung"].strip() == '':
+                logger.info(f"{word} has no Bedeutung, hence translating.")
+            elif de_to_en and not self._crawler.crawl_file_exists(word):
+                logger.info(f"{word} has no scrape file, hence scraping.")
+            else:
+                logger.debug(f"{word} already has a Bedeutung filled in and is scraped.")
+                continue                
+                                
             synonyms = ""
-            if len(row) >= 4 and row[3].strip() != '':
-                synonyms = row[3].strip()
+            if row["Synonyms"].strip() != '':
+                synonyms = row["Synonyms"].strip()
             
-            if ((empty_dump_file or word not in self._entries) or
-                (len(row) < 3 or row[2].strip() == '')):
-                to_be_scraped_queue[word] = {
-                    'de_to_en': de_to_en,
-                    'synonyms': synonyms
-                }
-                logger.debug(f"To be scraped: {word}: {to_be_scraped_queue[word]}")
+            to_be_scraped_queue[word] = {
+                'de_to_en': de_to_en,
+                'synonyms': synonyms
+            }
+            if row["Bedeutung"].strip() != '':
+                to_be_scraped_queue[word]["translation"] = row["Bedeutung"].strip()
+            logger.debug(f"To be scraped: {word}: {to_be_scraped_queue[word]}")
     
         if len(to_be_scraped_queue) > 0:
             with open(SCRAPE_QUEUE_FILE_NAME, 'w') as file:
@@ -282,10 +288,11 @@ class Compiler:
             spreadsheet = gc.open('Vokabeln und Phrasen')
 
             # Select the worksheet by title
-            self._worksheet = spreadsheet.worksheet('Sheet1')
+            self._worksheet = spreadsheet.worksheet('Vokabeln')
 
             # Get all values from the worksheet
-            self._gs_entries = self._worksheet.get_all_values()[1:]
+            # self._gs_entries = self._worksheet.get_all_values()[1:]
+            self._gs_entries = self._worksheet.get_all_records()
             
             logger.debug(f"Obtained values from GS: {self._gs_entries}")
                 
@@ -306,13 +313,13 @@ class Compiler:
         row_index = 2
         batch_updates = []
         for row in self._gs_entries:          
-            if row[0] is not None and row[0] != '':
-                word = row[0]
-            elif row[1] is not None and row[1] != '':
-                word = row[1]
+            if row["Deutsch"].strip() != '':
+                word = row["Deutsch"].strip()
+            elif row["Englisch"].strip() != '':
+                word = row["Englisch"].strip()
                 
             row_index += 1                
-            if len(row) >= 3 and row[2].strip() != '':
+            if row["Bedeutung"].strip():
                 # Already has a Bedeutung filled in.
                 continue
                 
