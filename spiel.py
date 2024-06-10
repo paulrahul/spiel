@@ -5,6 +5,7 @@ from numpy import polyfit
 import os
 import random
 
+import gs_reader
 from log import get_logger, update_logging_level
 from translation_compiler import Compiler, DUMP_FILE_NAME, DEEPL_KEY_VAR
 import util
@@ -13,6 +14,8 @@ logger = get_logger()
 
 SCORE_FILE_NAME = "_scores.txt"
 
+GS_SHEET_NAME = "Vokabeln und Phrasen"
+
 class DeutschesSpiel:
     def __init__(self, reload=False, use_semantic=False):
         self._reload = reload
@@ -20,6 +23,8 @@ class DeutschesSpiel:
         
         self._rows = {}  # {"word":<word>, "de_to_en":<>, "translation":<>,...}
         self._spiel_dict = {} # {<word>: <original word entry>}
+        
+        self._prepositions = []
         
         self._basic_scores = {}  # {<word>:[90.0, 45.0,...]}
         
@@ -61,7 +66,11 @@ class DeutschesSpiel:
         else:
             logger.debug("No scores file found.")
                 
-        self._prepare_game()            
+        self._prepare_game()        
+    
+    def _init_prepositions(self):
+        self._prepositions = gs_reader.fetch_from_gsheet(
+            GS_SHEET_NAME, "Prepositions")
     
     def sort_words(self, basic_scores):
         # Calculate the slope of the trend line for each word's scores
@@ -79,7 +88,8 @@ class DeutschesSpiel:
             logger.debug(f'{word}: {word_slopes[word]}')      
                 
     def _prepare_game(self):
-        self.sort_words(self._basic_scores)
+        # self.sort_words(self._basic_scores)
+        pass
 
     def _get_next_spiel_word(self):
         n = len(self._rows)
@@ -88,6 +98,8 @@ class DeutschesSpiel:
         
         interval = random.randint(1, ideal_interval)
         
+        logger.debug(f"{n=}, {sn=}, {ideal_interval=}, {interval=}")
+        
         index = 0
         asked = 0
         used_words = set()
@@ -95,24 +107,35 @@ class DeutschesSpiel:
         
         while True:        
             if index >= sn or asked >= interval:
+                logger.debug("Returning a random index word")
                 idx = random.randint(0, n - 1)
                 entry = self._rows[idx]
                 word = entry["word"]
+                
+                logger.debug(f"{idx=}, {word=}")
 
                 if word in used_words or idx in question_indices:
+                    logger.debug(f"Word is already used.")
                     continue
                 
                 if asked >= interval:
                     asked = 0
                     interval = random.randint(1, ideal_interval)
+                    
+                logger.debug(f"{word=}")
 
                 question_indices.add(idx)
                 yield word
             else:
+                logger.debug(f"Returning serial order {index} word.")
                 used_words.add(self._sorted_words[index])
                 yield self._sorted_words[index]
                 index += 1
                 asked += 1
+                
+    def _get_next_preposition(self):
+        idx = random.randint(0, len(self._prepositions))
+        return self._prepositions[idx]
 
     def get_scores(self):
         return [(w, self._basic_scores[w]) for w in self._sorted_words]
@@ -136,13 +159,24 @@ class DeutschesSpiel:
     '''
     def list(self):
         return list(self._spiel_dict.keys())
-            
-    def get_next_entry(self):
+    
+    def _get_spiel_word(self):
         next_spiel = self._get_next_spiel_word()
 
         while True:
             word = next(next_spiel)
             yield self._spiel_dict[word.lower()]
+    
+    def get_next_entry(self):
+        SPIEL_MODES = {
+            "word": self._get_spiel_word,
+            "prepositions": self._get_next_preposition
+        }
+        
+        # next_spiel_mode = random.choice(list(SPIEL_MODES.keys()))
+        next_spiel_mode = (list(SPIEL_MODES.keys()))[0]
+
+        return SPIEL_MODES[next_spiel_mode]()
         
     def exit_game(self):
         with open(SCORE_FILE_NAME, 'w') as file:

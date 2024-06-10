@@ -129,8 +129,14 @@ def dedupe():
         
     written_words = {}
     new_data = []
-    for row in existing_data:
+    for row in existing_data:  
         word = row["word"]
+      
+        keys = ["word", "de_to_en", "translation", "examples", "metadata", "synonyms"]
+        for k in keys:
+            if k not in row:
+                print(f"{k} not found in {word}")
+        
         if word in written_words:
             written_words[word] += 1
             continue
