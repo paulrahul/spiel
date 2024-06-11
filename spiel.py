@@ -16,11 +16,17 @@ import util
 logger = get_logger()
 
 SCORE_FILE_NAME = "_scores.txt"
+PREPOSITIONS_FILE_NAME = "_prepositions.txt"
 
 GS_SHEET_NAME = "Vokabeln und Phrasen"
 
 class DeutschesSpiel:
     def __init__(self, reload=False, use_semantic=False, use_multimode=False):
+        self.SPIEL_MODES = {
+            "word": self._get_spiel_word,
+            "prepositions": self._get_next_preposition
+        }        
+        
         self._reload = reload
         self._use_semantic = use_semantic
         self._use_multimode = use_multimode
@@ -76,8 +82,16 @@ class DeutschesSpiel:
         self._prepare_game()        
     
     def _init_prepositions(self):
-        self._prepositions = gs_reader.fetch_from_gsheet(
-            GS_SHEET_NAME, "Prepositions")
+        if not util.file_exists(PREPOSITIONS_FILE_NAME):
+            self._prepositions = gs_reader.fetch_from_gsheet(
+                GS_SHEET_NAME, "Prepositions")
+            
+            with open(PREPOSITIONS_FILE_NAME, 'w') as file:
+                logger.debug(f"Dumping prepositions to file.")
+                json.dump(self._prepositions, file)
+        else:
+            with open(PREPOSITIONS_FILE_NAME, 'r') as file:
+                self._prepositions = json.load(file)
     
     def sort_words(self, basic_scores):
         # Calculate the slope of the trend line for each word's scores
@@ -142,7 +156,7 @@ class DeutschesSpiel:
                 
     def _get_next_preposition(self):
         idx = random.randint(0, len(self._prepositions))
-        return self._prepositions[idx]
+        yield self._prepositions[idx]
 
     def get_scores(self):
         return [(w, self._basic_scores[w]) for w in self._sorted_words]
@@ -174,18 +188,14 @@ class DeutschesSpiel:
             word = next(next_spiel)
             yield self._spiel_dict[word.lower()]
     
-    def get_next_entry(self):
-        SPIEL_MODES = {
-            "word": self._get_spiel_word,
-            "prepositions": self._get_next_preposition
-        }
-        
+    def get_next_entry(self):        
         if self._use_multimode:
-            next_spiel_mode = random.choice(list(SPIEL_MODES.keys()))
+            next_spiel_mode = random.choice(list(self.SPIEL_MODES.keys()))
         else:
-            next_spiel_mode = (list(SPIEL_MODES.keys()))[0]
+            next_spiel_mode = (list(self.SPIEL_MODES.keys()))[0]
 
-        return SPIEL_MODES[next_spiel_mode]()
+        val = self.SPIEL_MODES[next_spiel_mode]()
+        return {"mode": next_spiel_mode, "value": val}
         
     def exit_game(self):
         with open(SCORE_FILE_NAME, 'w') as file:
@@ -198,33 +208,38 @@ class DeutschesSpiel:
         return (correctness_string(score), score)
      
     def play_game(self):
-        next_entry = self.get_next_entry()
         while True:
-            entry = next(next_entry)
-            word = entry["word"]
+            next_entry = self.get_next_entry()        
+            entry = next(next_entry["value"])
             
-            user_answer = input(
-                Fore.CYAN + f'Was bedeutet {word}?: ' + Style.RESET_ALL).strip().lower()
-            if len(user_answer) > 0:
-                (score_string, score) = self.get_answer_score(
-                    user_answer, entry["translation"])
-                print(
-                    f"Deine Antwort ist {score_string}, " +
-                    f"Ähnlichkeitwert {score}")
-            else:
-                score = 0
+            if next_entry["mode"] == "word":
+                word = entry["word"]
                 
-            if word in self._basic_scores:
-                self._basic_scores[word].append(score)
-            else:
-                self._basic_scores[word] = [score]
+                user_answer = input(
+                    Fore.CYAN + f'Was bedeutet {word}?: ' + Style.RESET_ALL).strip().lower()
+                if len(user_answer) > 0:
+                    (score_string, score) = self.get_answer_score(
+                        user_answer, entry["translation"])
+                    print(
+                        f"Deine Antwort ist {score_string}, " +
+                        f"Ähnlichkeitwert {score}")
+                else:
+                    score = 0
+                    
+                if word in self._basic_scores:
+                    self._basic_scores[word].append(score)
+                else:
+                    self._basic_scores[word] = [score]
+                    
+                print(Fore.GREEN + f"\nEchte Antwort: {entry['translation'].upper()}" + Style.RESET_ALL + 
+                    Back.GREEN + Style.BRIGHT + "\n\nExamples:" + Style.RESET_ALL)
+                _print_examples(entry["examples"])
                 
-            print(Fore.GREEN + f"\nEchte Antwort: {entry['translation'].upper()}" + Style.RESET_ALL + 
-                  Back.GREEN + Style.BRIGHT + "\n\nExamples:" + Style.RESET_ALL)
-            _print_examples(entry["examples"])
-            
-            if "genus" in entry['metadata']:
-                print(Back.GREEN + Style.BRIGHT + f"\nGenus:" + Style.RESET_ALL + " " + str(entry['metadata']['genus']))
+                if "genus" in entry['metadata']:
+                    print(Back.GREEN + Style.BRIGHT + f"\nGenus:" + Style.RESET_ALL + " " + str(entry['metadata']['genus']))
+
+            elif next_entry["mode"] == "prepositions":
+                print(entry)
             
             if not prompt('\nWeiter?'):                    
                 print(f"\nThank You!!\n")
