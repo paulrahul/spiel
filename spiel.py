@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all()
+
 from colorama import Back, Fore, Style
 import json
 import math
@@ -17,9 +20,10 @@ SCORE_FILE_NAME = "_scores.txt"
 GS_SHEET_NAME = "Vokabeln und Phrasen"
 
 class DeutschesSpiel:
-    def __init__(self, reload=False, use_semantic=False):
+    def __init__(self, reload=False, use_semantic=False, use_multimode=False):
         self._reload = reload
         self._use_semantic = use_semantic
+        self._use_multimode = use_multimode
         
         self._rows = {}  # {"word":<word>, "de_to_en":<>, "translation":<>,...}
         self._spiel_dict = {} # {<word>: <original word entry>}
@@ -65,6 +69,9 @@ class DeutschesSpiel:
                 self._basic_scores = json.load(file)
         else:
             logger.debug("No scores file found.")
+        
+        if self._use_multimode:    
+            self._init_prepositions()
                 
         self._prepare_game()        
     
@@ -173,8 +180,10 @@ class DeutschesSpiel:
             "prepositions": self._get_next_preposition
         }
         
-        # next_spiel_mode = random.choice(list(SPIEL_MODES.keys()))
-        next_spiel_mode = (list(SPIEL_MODES.keys()))[0]
+        if self._use_multimode:
+            next_spiel_mode = random.choice(list(SPIEL_MODES.keys()))
+        else:
+            next_spiel_mode = (list(SPIEL_MODES.keys()))[0]
 
         return SPIEL_MODES[next_spiel_mode]()
         
@@ -301,7 +310,8 @@ if __name__ == "__main__":
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug logging level')
     parser.add_argument('--semantic', '-s', action='store_true', help='Enable semantic comparison')
     parser.add_argument('--scrape_new', action='store_true', help='Load new translations')
-    parser.add_argument('--simulate', '-sm', action='store_true', help='Enable simulation mode')    
+    parser.add_argument('--simulate', '-sm', action='store_true', help='Enable simulation mode')
+    parser.add_argument('--multi', '-m', action='store_true', help='Enable multi mode')        
     args = parser.parse_args()
 
     if args.debug:
@@ -315,7 +325,11 @@ if __name__ == "__main__":
         
     simulate = args.simulate
     if simulate:
-        logger.info("Enabled simulation mode")   
+        logger.info("Enabled simulation mode")
+        
+    use_multimode = args.multi
+    if use_multimode:
+        logger.info("Enabled use_multimode mode")
         
     if args.scrape_new:
         api_key = None
@@ -329,7 +343,7 @@ if __name__ == "__main__":
         compiler = Compiler(api_key, simulate)
         compiler.scrape_new(reload=True)
 
-    spiel = DeutschesSpiel(use_semantic)
+    spiel = DeutschesSpiel(use_semantic=use_semantic, use_multimode=use_multimode)
     if prompt('Möchtest du ein Spiel spielen?'):
         spiel.play_game()
     elif prompt('Möchtest du deine Notizen überarbeiten?'):

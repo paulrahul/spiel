@@ -11,7 +11,7 @@ class FileReadError(Exception):
         super().__init__(message)
         self.original_exception = original_exception
 
-def fetch_from_gsheet(self, spreadsheet, sheet):
+def fetch_from_gsheet(spreadsheet, sheet):
     try:
         logger.debug(f"Reading Google Spreadsheet file {spreadsheet},{sheet}")
         
@@ -22,10 +22,10 @@ def fetch_from_gsheet(self, spreadsheet, sheet):
         spreadsheet = gc.open(spreadsheet)
 
         # Select the worksheet by title
-        self._worksheet = spreadsheet.worksheet(sheet)
+        worksheet = spreadsheet.worksheet(sheet)
 
         # Get all values from the worksheet
-        gs_entries = self._worksheet.get_all_records()
+        gs_entries = worksheet.get_all_records()
         
         logger.debug(f"Obtained values from GS: {gs_entries}")
         
