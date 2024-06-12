@@ -86,16 +86,27 @@
       <p id="num_questions"></p>
     </div>
 
-    <div class="question">
-      {% if entry["de_to_en"] %}
-        <p>Was bedeutet <span class="highlight">{{ entry["word"] }}</span>?</p>
-      {% else %}
-        <p>Was ist das Deutche Wort für <span class="highlight">{{ entry["word"] }}</span>?</p>
-      {% endif %}
-    </div>
-
     <form id="quizForm">
-      <input type="text" id="answer" placeholder="Deine Antwort...">
+      <div class="question">
+        {% if entry["mode"] == "word" %}
+
+          {% if entry["de_to_en"] %}
+            <p>Was bedeutet <span class="highlight">{{ entry["word"] }}</span>?</p>
+          {% else %}
+            <p>Was ist das Deutche Wort für <span class="highlight">{{ entry["word"] }}</span>?</p>
+          {% endif %}
+
+          <input type="text" id="answer" placeholder="Deine Antwort...">
+
+        {% elif entry["mode"] == "preposition" %}
+          <p>Welche Präposition soll mit <span class="highlight">{{ entry["verb"] }}</span> verwendet werden?</p>
+          <input type="text" id="answer_preposition" placeholder="Deine Antwort...">
+
+          <p>Und nutzt man Akkusativ oder Dativ?</p>
+          <input type="text" id="answer_akkdat" placeholder="Deine Antwort...">
+        {% endif %}
+      </div>
+
       <input type="submit" value="Submit">
     </form>
 
@@ -107,21 +118,30 @@
 
     <div id="result" style="display: none;">
       <p id="scorePara"> </p>
-      <h3>Echte Antwort: {{ entry["translation"] }}</h3>
-
-      {% set synonyms = entry["synonyms"] %}
-      {% if synonyms != '' %}
-        <h4>Synonyme: {{ entry["synonyms"] }}</h4>
+      {% set answer = '' %}
+      {% if entry["mode"] == "word" %}
+        {% set answer = entry["translation"] %}
+      {% elif entry["mode"] == "preposition" %}
+        {% set answer = entry["preposition"] + ' ' + entry["akk_dat"] %}
       {% endif %}
-      
-      <div class="examples_container">
-        {% for item in entry['examples'] %}
-            <div class="item">
-                <div>{{ item[0] }}</div>
-                <div class="italic">{{ item[1] }}</div>
-            </div>
-        {% endfor %}
-      </div>
+
+      <h3>Echte Antwort: {{ answer }}</h3>
+
+      {% if entry["mode"] == "word" %}
+        {% set synonyms = entry["synonyms"] %}
+        {% if synonyms != '' %}
+          <h4>Synonyme: {{ entry["synonyms"] }}</h4>
+        {% endif %}
+        
+        <div class="examples_container">
+          {% for item in entry['examples'] %}
+              <div class="item">
+                  <div>{{ item[0] }}</div>
+                  <div class="italic">{{ item[1] }}</div>
+              </div>
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
 
     <div class="links">

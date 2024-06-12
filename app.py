@@ -7,8 +7,7 @@ from werkzeug.utils import redirect
 from .spiel import DeutschesSpiel
 from .translation_compiler import Compiler
 
-spiel = DeutschesSpiel(use_semantic=False)
-next_entry = spiel.get_next_entry()
+spiel = DeutschesSpiel(use_semantic=False, use_multimode=True)
 
 def create_app():
     app = Flask(__name__)
@@ -58,7 +57,9 @@ def create_app():
     
     @app.route("/next_question")
     def next_question():
-        next_question = next(next_entry)
+        next_entry = spiel.get_next_entry()
+        next_question = next(next_entry["value"])
+        next_question["mode"] = next_entry["mode"]
         start = False
     
         query_param = request.args.get('mode')

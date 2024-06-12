@@ -24,7 +24,7 @@ class DeutschesSpiel:
     def __init__(self, reload=False, use_semantic=False, use_multimode=False):
         self.SPIEL_MODES = {
             "word": self._get_spiel_word,
-            "prepositions": self._get_next_preposition
+            "preposition": self._get_next_preposition
         }        
         
         self._reload = reload
@@ -238,8 +238,33 @@ class DeutschesSpiel:
                 if "genus" in entry['metadata']:
                     print(Back.GREEN + Style.BRIGHT + f"\nGenus:" + Style.RESET_ALL + " " + str(entry['metadata']['genus']))
 
-            elif next_entry["mode"] == "prepositions":
-                print(entry)
+            elif next_entry["mode"] == "preposition":
+                verb = entry["verb"]
+                user_preposition_answer = input(
+                    Fore.CYAN + f'Welce Präposition soll mit {verb} verwendet werden?: ' + Style.RESET_ALL).strip().lower()
+                user_akkdat_answer = ""
+                while user_akkdat_answer.lower() not in ["a", "d"]:
+                    user_akkdat_answer = input(
+                        Fore.CYAN + f'Akkusativ oder Dativ. Gibst bitte "A" oder "D" an?: ' + Style.RESET_ALL).strip().lower()
+
+                if len(user_preposition_answer) > 0:
+                    (score_string, score) = self.get_answer_score(
+                        user_preposition_answer, entry["preposition"])
+                    print(
+                        f"Deine Antwort ist {score_string}, " +
+                        f"Ähnlichkeitwert {score}")
+                    
+                    user_akkdat_answer = "acc" if user_akkdat_answer.lower() == "a" else "dat"
+                    (score_string, score) = self.get_answer_score(
+                        user_akkdat_answer, entry["akk_dat"])
+                    print(
+                        f"Deine Antwort ist {score_string}, " +
+                        f"Ähnlichkeitwert {score}")                    
+                else:
+                    score = 0
+                    
+                print(Fore.GREEN + f"\nEchte Antwort: {entry['verb']} {entry['preposition']} + {entry['akk_dat']}" + Style.RESET_ALL + 
+                    Back.GREEN + Style.BRIGHT + "\n\nExamples:" + Style.RESET_ALL)                    
             
             if not prompt('\nWeiter?'):                    
                 print(f"\nThank You!!\n")
