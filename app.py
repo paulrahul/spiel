@@ -57,11 +57,16 @@ def create_app():
     
     @app.route("/next_question")
     def next_question():
-        next_entry = spiel.get_next_entry()
-        next_question = next(next_entry["value"])
+        query_param = request.args.get('order')
+        if query_param is not None and query_param == "serial":
+            next_entry = spiel.get_next_entry(serial=True)
+        else:
+            next_entry = spiel.get_next_entry(serial=False)
+        
+        next_question = next_entry["value"]
         next_question["mode"] = next_entry["mode"]
+        
         start = False
-    
         query_param = request.args.get('mode')
         if query_param is not None:
             if query_param == "json":                

@@ -114,6 +114,14 @@
       <a href="/lookup?wort={{ entry["word"] }}" class="lookup-link">Lookup</a>
       <a href="#" class="next-link">Next</a>
       <a href="/exit" class="exit-link">Exit</a>
+
+      <label>
+          <input type="radio" class="radio-random" name="order" value="random"> Zufällig
+      </label>
+      <label>
+          <input type="radio" class="radio-serial" name="order" value="serial"> Reihenfolge
+      </label>
+
     </div>
 
     <div id="result" style="display: none;">
@@ -147,6 +155,14 @@
     <div class="links">
       <a href="#" class="next-link">Next</a>
       <a href="/exit" class="exit-link">Exit</a>
+
+      <label>
+        <input type="radio" class="radio-random" name="order" value="random"> Zufällig
+      </label>
+      <label>
+          <input type="radio" class="radio-serial" name="order" value="serial"> Reihenfolge
+      </label>
+
     </div>
   </div>
 
@@ -195,7 +211,20 @@
       // Check the value of the variable and call the JavaScript method if it's set
       if (isStartMode) {
         resetStats();
-      } 
+      }
+
+      let order = localStorage.getItem('order');
+      if (order == undefined || order == "random") {
+        document.querySelectorAll('.radio-random').forEach(function(randomRadio) {
+          randomRadio.checked = true;
+        });
+        // document.querySelector('input[name="order"][value="random"]').checked = true;
+      } else {
+        document.querySelectorAll('.radio-serial').forEach(function(serialRadio) {
+          serialRadio.checked = true;
+        });        
+        // document.querySelector('input[name="order"][value="serial"]').checked = true;
+      }
       
       displayStats();
     }; // window.onload

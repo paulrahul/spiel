@@ -23,7 +23,7 @@ GS_SHEET_NAME = "Vokabeln und Phrasen"
 class DeutschesSpiel:
     def __init__(self, reload=False, use_semantic=False, use_multimode=False):
         self.SPIEL_MODES = {
-            "word": self._get_spiel_word,
+            "word": self._get_next_spiel_word,
             "preposition": self._get_next_preposition
         }        
         
@@ -39,7 +39,9 @@ class DeutschesSpiel:
         self._basic_scores = {}  # {<word>:[90.0, 45.0,...]}
         
         self._sorted_words = []
-
+        
+        self._mode_handlers = {}
+        
         self._init()
 
     def _init(self):
@@ -76,7 +78,13 @@ class DeutschesSpiel:
         else:
             logger.debug("No scores file found.")
         
-        if self._use_multimode:    
+        for k, v in self.SPIEL_MODES.items():
+            self._mode_handlers[k] = {
+                "random": v(serial=False),
+                "serial": v(serial=True)
+            }
+        
+        if self._use_multimode:
             self._init_prepositions()
                 
         self._prepare_game()        
@@ -112,7 +120,7 @@ class DeutschesSpiel:
         # self.sort_words(self._basic_scores)
         pass
 
-    def _get_next_spiel_word(self):
+    def _get_spiel_word(self, serial):
         n = len(self._rows)
         sn = len(self._sorted_words)
         ideal_interval = math.ceil(sn / n - sn) if sn > n - sn else 1
@@ -126,8 +134,14 @@ class DeutschesSpiel:
         used_words = set()
         question_indices = set()
         
-        while True:        
-            if index >= sn or asked >= interval:
+        while True:
+            if not serial and (index >= sn or asked >= interval):
+                # I guess the idea was that we serially show the 'sorted words'
+                # or basically the words that are sorted by previous scores
+                # except when an 'interval' number of words have already been
+                # asked or if all scored words have already been asked. In that
+                # case, just return a random word index. 
+                
                 logger.debug("Returning a random index word")
                 idx = random.randint(0, n - 1)
                 entry = self._rows[idx]
@@ -149,15 +163,19 @@ class DeutschesSpiel:
                 yield word
             else:
                 logger.debug(f"Returning serial order {index} word.")
-                used_words.add(self._sorted_words[index])
-                yield self._sorted_words[index]
+                if index < sn:
+                    used_words.add(self._sorted_words[index])
+                    yield self._sorted_words[index]
+                else:
+                    entry = self._rows[index]
+                    word = entry["word"]
+                    
+                    used_words.add(word)
+                    yield word
+                    
                 index += 1
                 asked += 1
                 
-    def _get_next_preposition(self):
-        idx = random.randint(0, len(self._prepositions))
-        yield self._prepositions[idx]
-
     def get_scores(self):
         return [(w, self._basic_scores[w]) for w in self._sorted_words]
         
@@ -181,20 +199,52 @@ class DeutschesSpiel:
     def list(self):
         return list(self._spiel_dict.keys())
     
-    def _get_spiel_word(self):
-        next_spiel = self._get_next_spiel_word()
+    
+    '''
+    Start of next iterator methods.
+    '''
+    def _get_next_spiel_word(self, serial):
+        next_spiel = self._get_spiel_word(serial)
 
         while True:
             word = next(next_spiel)
             yield self._spiel_dict[word.lower()]
-    
-    def get_next_entry(self):        
+
+    def _get_next_preposition(self, serial):
+        idx = -1
+        
+        while True:
+            if serial:
+                idx += 1
+                if idx >= len(self._prepositions):
+                    idx = 0
+            else:
+                idx = random.randint(0, len(self._prepositions))
+
+            yield self._prepositions[idx]
+    '''
+    End of next iterator methods.
+    '''
+
+    '''
+    Main methods to return next question.
+    '''
+    def get_next_entry(self, mode=None, serial=False):        
         if self._use_multimode:
             next_spiel_mode = random.choice(list(self.SPIEL_MODES.keys()))
         else:
-            next_spiel_mode = (list(self.SPIEL_MODES.keys()))[0]
+            next_spiel_mode = mode
 
-        val = self.SPIEL_MODES[next_spiel_mode]()
+        if not next_spiel_mode:
+            raise Exception("No mode provided")
+        
+        logger.debug(f"Returning question of mode {next_spiel_mode}")
+
+        if serial:
+            val = next(self._mode_handlers[next_spiel_mode]["serial"])
+        else:
+            val = next(self._mode_handlers[next_spiel_mode]["random"])
+
         return {"mode": next_spiel_mode, "value": val}
         
     def exit_game(self):
@@ -209,8 +259,8 @@ class DeutschesSpiel:
      
     def play_game(self):
         while True:
-            next_entry = self.get_next_entry()        
-            entry = next(next_entry["value"])
+            next_entry = self.get_next_entry(serial=True)        
+            entry = next_entry["value"]
             
             if next_entry["mode"] == "word":
                 word = entry["word"]
@@ -241,7 +291,7 @@ class DeutschesSpiel:
             elif next_entry["mode"] == "preposition":
                 verb = entry["verb"]
                 user_preposition_answer = input(
-                    Fore.CYAN + f'Welce Präposition soll mit {verb} verwendet werden?: ' + Style.RESET_ALL).strip().lower()
+                    Fore.CYAN + f'Welche Präposition soll mit {verb} verwendet werden?: ' + Style.RESET_ALL).strip().lower()
                 user_akkdat_answer = ""
                 while user_akkdat_answer.lower() not in ["a", "d"]:
                     user_akkdat_answer = input(
@@ -351,7 +401,7 @@ if __name__ == "__main__":
     parser.add_argument('--semantic', '-s', action='store_true', help='Enable semantic comparison')
     parser.add_argument('--scrape_new', action='store_true', help='Load new translations')
     parser.add_argument('--simulate', '-sm', action='store_true', help='Enable simulation mode')
-    parser.add_argument('--multi', '-m', action='store_true', help='Enable multi mode')        
+    parser.add_argument('--multi', '-m', action='store_true', help='Enable multi mode')      
     args = parser.parse_args()
 
     if args.debug:

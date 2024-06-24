@@ -69,8 +69,22 @@ function handleExitLinkClick() {
 }
 
 function handleNextLinkClick() {
-    console.log("next clicked");
-    window.location.href = "/next_question";
+    const radios = document.getElementsByName('order');
+    let selectedValue;
+    for (const radio of radios) {
+        if (radio.checked) {
+            selectedValue = radio.value;
+            break;
+        }
+    }
+    
+    if (selectedValue != undefined && selectedValue == "serial") {
+        localStorage.setItem('order', "serial");
+        window.location.href = "/next_question?order=serial";
+    } else {
+        localStorage.setItem('order', "random");
+        window.location.href = "/next_question";
+    }
 }
 
 // Function to handle periodic saving of data
