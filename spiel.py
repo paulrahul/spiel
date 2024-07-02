@@ -230,7 +230,13 @@ class DeutschesSpiel:
     '''
     Main methods to return next question.
     '''
-    def get_next_entry(self, mode=None, serial=False, start=None):        
+    def get_next_entry(self, mode=None, serial=False, start=None):
+        if start:
+            if not serial:
+                raise Exception("Start value provided but order is not serial.")            
+            if not mode:
+                raise Exception("No mode provided for start value.")
+              
         if self._use_multimode:
             next_spiel_mode = random.choice(list(self.SPIEL_MODES.keys()))
         else:
