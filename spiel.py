@@ -84,8 +84,7 @@ class DeutschesSpiel:
                 "serial": v(serial=True)
             }
         
-        if self._use_multimode:
-            self._init_prepositions()
+        self._init_prepositions()
                 
         self._prepare_game()        
     
@@ -167,6 +166,8 @@ class DeutschesSpiel:
                     used_words.add(self._sorted_words[index])
                     yield self._sorted_words[index]
                 else:
+                    if index >= n:
+                        index = 0
                     entry = self._rows[index]
                     word = entry["word"]
                     
@@ -229,7 +230,7 @@ class DeutschesSpiel:
     '''
     Main methods to return next question.
     '''
-    def get_next_entry(self, mode=None, serial=False):        
+    def get_next_entry(self, mode=None, serial=False, start=None):        
         if self._use_multimode:
             next_spiel_mode = random.choice(list(self.SPIEL_MODES.keys()))
         else:
@@ -241,7 +242,20 @@ class DeutschesSpiel:
         logger.debug(f"Returning question of mode {next_spiel_mode}")
 
         if serial:
-            val = next(self._mode_handlers[next_spiel_mode]["serial"])
+            while True:
+                val = next(self._mode_handlers[next_spiel_mode]["serial"])
+                if start:
+                    # TODO: Clean up this rubbish implementation.
+                    if next_spiel_mode == "word":
+                        qn = val["word"]
+                    elif next_spiel_mode == "preposition":
+                        qn = val["verb"]
+                        
+                    if start.lower() == qn.lower():
+                        break
+                    logger.debug(f"Looking for {start}, reached till {qn}")
+                else:
+                    break            
         else:
             val = next(self._mode_handlers[next_spiel_mode]["random"])
 
