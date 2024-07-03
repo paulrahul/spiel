@@ -90,6 +90,8 @@
       <div class="question">
         {% if entry["mode"] == "word" %}
 
+          <input type="hidden" id="question_key" value="{{ 'word;' + entry["word"] }}">
+
           {% if entry["de_to_en"] %}
             <p>Was bedeutet <span class="highlight">{{ entry["word"] }}</span>?</p>
           {% else %}
@@ -99,6 +101,8 @@
           <input type="text" id="answer" placeholder="Deine Antwort...">
 
         {% elif entry["mode"] == "preposition" %}
+          <input type="hidden" id="question_key" value="{{ 'preposition;' + entry["verb"] }}">
+
           <p>Welche Präposition soll mit <span class="highlight">{{ entry["verb"] }}</span> verwendet werden?</p>
           <input type="text" id="answer_preposition" placeholder="Deine Antwort...">
 
@@ -130,7 +134,7 @@
       {% if entry["mode"] == "word" %}
         {% set answer = entry["translation"] %}
       {% elif entry["mode"] == "preposition" %}
-        {% set answer = entry["preposition"] + ' ' + entry["akk_dat"] + ' ::: ' + entry["bedeutung"] %}
+        {% set answer = entry["verb"] + ' ' + entry["preposition"] + ' ' + entry["akk_dat"] + ' ::: ' + entry["bedeutung"] %}
       {% endif %}
 
       <h3>Echte Antwort: {{ answer }}</h3>
@@ -227,6 +231,7 @@
       }
       
       displayStats();
+      saveLastQuestionData(document.getElementById("question_key").value);
     }; // window.onload
   </script>
 </body>

@@ -37,8 +37,8 @@ def create_app():
         
     @app.route('/seed_scores', methods=['POST'])
     def seed_scores():
-        # # Receive the data sent in the POST request
-        # data = request.json
+        # Receive the data sent in the POST request
+        data = request.json
         
         # # convert to map
         # scores = {}
@@ -47,8 +47,18 @@ def create_app():
         
         # # Call the Python method to process the data
         # get_spiel().sort_words(scores)
-        
-        return jsonify({'redirect_url': url_for('next_question', **{"mode": "start"})})
+        if "key" in data and "type" in data:
+            return jsonify({'redirect_url': url_for('next_question', **{
+                "mode": "start",
+                "start": data["key"] if "key" in data else None,
+                "question_type": data["type"] if "type" in data else None,
+                "order": "serial"
+            })})
+        else:
+            return jsonify({'redirect_url': url_for('next_question', **{
+                "mode": "start"
+            })})
+            
         # return redirect(url_for('next_question', **{"mode": "start"}))
         
     @app.route("/play")

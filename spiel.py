@@ -236,30 +236,35 @@ class DeutschesSpiel:
                 raise Exception("Start value provided but order is not serial.")            
             if not mode:
                 raise Exception("No mode provided for start value.")
-              
-        if self._use_multimode:
-            next_spiel_mode = random.choice(list(self.SPIEL_MODES.keys()))
-        else:
-            next_spiel_mode = mode
 
-        if not next_spiel_mode:
+        if mode:
+            next_spiel_mode = mode
+        elif self._use_multimode:
+            next_spiel_mode = random.choice(list(self.SPIEL_MODES.keys()))
+        else:           
             raise Exception("No mode provided")
         
-        logger.debug(f"Returning question of mode {next_spiel_mode}")
+        logger.debug(f"Returning question of mode {next_spiel_mode}, serial {serial}, start {start}")
 
         if serial:
+            cnt = 0
             while True:
                 val = next(self._mode_handlers[next_spiel_mode]["serial"])
+                cnt += 1
                 if start:
                     # TODO: Clean up this rubbish implementation.
                     if next_spiel_mode == "word":
+                        if cnt > len(self._rows):
+                            raise Exception(f"Could not find word {start}")
                         qn = val["word"]
                     elif next_spiel_mode == "preposition":
+                        if cnt > len(self._prepositions):
+                            raise Exception(f"Could not find preposition {start}")
                         qn = val["verb"]
                         
                     if start.lower() == qn.lower():
-                        break
-                    logger.debug(f"Looking for {start}, reached till {qn}")
+                        break                    
+                    logger.debug(f"Looking for {start} in mode {next_spiel_mode}, reached till {qn}")
                 else:
                     break            
         else:
@@ -279,7 +284,7 @@ class DeutschesSpiel:
      
     def play_game(self):
         while True:
-            next_entry = self.get_next_entry(serial=True)        
+            next_entry = self.get_next_entry(serial=True, start="Ereignis", mode="word")        
             entry = next_entry["value"]
             
             if next_entry["mode"] == "word":

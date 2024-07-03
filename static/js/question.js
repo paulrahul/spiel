@@ -55,6 +55,14 @@ function loadDataFromLocalStorage() {
     }
 }
 
+function saveLastQuestionData(lastQuestion) {
+    let type = lastQuestion.split(';')[0];
+    let key = lastQuestion.split(';')[1];
+    let last = {"type": type, "key": key};
+
+    localStorage.setItem('last', JSON.stringify(last));
+}
+
 function flushStats() {
     stats.historical_num_questions += stats.num_questions;
     
@@ -80,6 +88,14 @@ function handleNextLinkClick() {
     
     if (selectedValue != undefined && selectedValue == "serial") {
         localStorage.setItem('order', "serial");
+        // let last = localStorage.getItem('last');
+        // if (last != undefined) {
+        //     let question_type = last.split(';')[0];
+        //     let key = last.split(';')[1];
+        //     window.location.href = "/next_question?order=serial&start="+key+"&question_type="+question_type;    
+        // } else {
+        //     window.location.href = "/next_question?order=serial";
+        // }
         window.location.href = "/next_question?order=serial";
     } else {
         localStorage.setItem('order', "random");

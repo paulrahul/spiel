@@ -62,12 +62,16 @@
     <script>
         function handlePlayClick() {
             let storedData = localStorage.getItem('basicScores');
-            if (storedData) {
+            let start = localStorage.getItem('last');
+            const combinedObj = { ...JSON.parse(storedData), ...JSON.parse(start)};
+            const postData = JSON.stringify(combinedObj);
+
+            if (postData) {
                 $.ajax({
                     url: '/seed_scores',
                     type: 'POST',
                     contentType: 'application/json',
-                    data: storedData,
+                    data: postData,
                     success: function(response) {
                         console.log('Scores seeded');
                         // Do something with the response if needed
