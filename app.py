@@ -47,11 +47,11 @@ def create_app():
         
         # # Call the Python method to process the data
         # get_spiel().sort_words(scores)
-        if "key" in data and "type" in data:
+        if "type" in data and "key_" + data["type"] in data:
             return jsonify({'redirect_url': url_for('next_question', **{
                 "mode": "start",
-                "start": data["key"] if "key" in data else None,
-                "question_type": data["type"] if "type" in data else None,
+                "question_type": data["type"],
+                "start": data["key_" + data["type"]],
                 "order": "serial"
             })})
         else:

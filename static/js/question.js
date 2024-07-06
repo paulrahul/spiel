@@ -58,7 +58,17 @@ function loadDataFromLocalStorage() {
 function saveLastQuestionData(lastQuestion) {
     let type = lastQuestion.split(';')[0];
     let key = lastQuestion.split(';')[1];
-    let last = {"type": type, "key": key};
+    let type_key = "key_" + type;
+
+    let last = localStorage.getItem("last");
+    if (last) {
+        last = JSON.parse(last);
+    } else {
+        last = {};
+    }
+
+    last["type"] = type;
+    last[type_key] = key;
 
     localStorage.setItem('last', JSON.stringify(last));
 }
