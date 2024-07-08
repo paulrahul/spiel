@@ -69,8 +69,21 @@ function saveLastQuestionData(lastQuestion) {
 
     last["type"] = type;
     last[type_key] = key;
-
     localStorage.setItem('last', JSON.stringify(last));
+
+    let unasked = localStorage.getItem("unasked");
+    if (unasked) {
+        unasked = new Set(JSON.parse(unasked));
+
+        if (unasked.has(type)) {
+            unasked.delete(type);
+            if (unasked.size == 0) {
+                localStorage.removeItem("unasked");
+            } else {
+                localStorage.setItem("unasked", JSON.stringify(Array.from(unasked)));
+            }
+        }
+    }
 }
 
 function flushStats() {
@@ -98,6 +111,35 @@ function handleNextLinkClick() {
     
     if (selectedValue != undefined && selectedValue == "serial") {
         localStorage.setItem('order', "serial");
+
+        let nextType = undefined;
+        let unasked = localStorage.getItem("unasked");
+        if (unasked) {
+            unasked = new Set(JSON.parse(unasked));
+            if (unasked.size > 0) {
+                nextType = unasked.values().next().value;
+            }
+        }
+        console.log(nextType);
+
+        let nextKey = undefined;
+        let last = localStorage.getItem('last');
+        if (last) {
+            last = JSON.parse(last);
+
+            let typeAttr = "key_" + nextType;
+            if (typeAttr in last) {
+                nextKey = last[typeAttr];
+            }
+        }
+
+
+        if (nextType != undefined && nextKey != undefined) {
+            window.location.href = "/next_question?order=serial&start="+nextKey+"&question_type="+nextType;
+        } else {
+            window.location.href = "/next_question?order=serial";
+        }
+
         // let last = localStorage.getItem('last');
         // if (last != undefined) {
         //     let question_type = last.split(';')[0];
@@ -106,7 +148,6 @@ function handleNextLinkClick() {
         // } else {
         //     window.location.href = "/next_question?order=serial";
         // }
-        window.location.href = "/next_question?order=serial";
     } else {
         localStorage.setItem('order', "random");
         window.location.href = "/next_question";
