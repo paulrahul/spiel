@@ -2,24 +2,40 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 from flask import Flask, abort, redirect, render_template, request, url_for, jsonify
+from functools import wraps
 from werkzeug.utils import redirect
+import uuid
 
 from .spiel import DeutschesSpiel
 from .translation_compiler import Compiler
 
 spiel = DeutschesSpiel(use_semantic=False, use_multimode=True)
 
+# Generate a unique session ID when the server starts
+def _generate_session_id():
+    return str(uuid.uuid4())
+
 def create_app():
     app = Flask(__name__)
 
     app.config.from_mapping(
         DEEPL_KEY = os.environ.get("DEEPL_KEY"),
-        SPIEL_MODE = os.environ.get("SPIEL_MODE")
+        SPIEL_MODE = os.environ.get("SPIEL_MODE"),
+        SESSION_ID = _generate_session_id()
     )
 
     def is_prod_mode():
         mode = app.config["SPIEL_MODE"]
         return mode is not None and mode == "PROD"
+    
+    def validate_session_id(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            session_id = request.args.get('session_id')
+            if not session_id or session_id != app.config["SESSION_ID"]:
+                return jsonify(error="Forbidden: Invalid session ID"), 408
+            return f(*args, **kwargs)
+        return decorated_function  
 
     @app.route("/")
     def index():
@@ -47,18 +63,22 @@ def create_app():
         
         # # Call the Python method to process the data
         # get_spiel().sort_words(scores)
+        
         if "type" in data and "key_" + data["type"] in data:
-            return jsonify({'redirect_url': url_for('next_question', **{
+            response = jsonify({'redirect_url': url_for('next_question', **{
                 "mode": "start",
                 "question_type": data["type"],
                 "start": data["key_" + data["type"]],
                 "order": "serial"
             })})
         else:
-            return jsonify({'redirect_url': url_for('next_question', **{
+            response = jsonify({'redirect_url': url_for('next_question', **{
                 "mode": "start"
             })})
-            
+        
+        session_id = app.config["SESSION_ID"]
+        response.headers['X-Session-ID'] = session_id
+        return response
         # return redirect(url_for('next_question', **{"mode": "start"}))
         
     @app.route("/play")
@@ -66,6 +86,7 @@ def create_app():
         return redirect(url_for('next_question'))
     
     @app.route("/next_question")
+    @validate_session_id
     def next_question():
         query_param = request.args.get('order')
         try:
@@ -95,7 +116,8 @@ def create_app():
         return render_template(
             "question.html",
             start=start,
-            entry=next_question)
+            entry=next_question,
+            session_id=app.config["SESSION_ID"])
         
     @app.route("/lookup")
     def lookup():

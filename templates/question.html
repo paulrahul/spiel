@@ -69,7 +69,7 @@
   
   <link rel="stylesheet" href="{{url_for('static', filename='css/dark_theme_toggle.css')}}"> 
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>  
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -87,6 +87,8 @@
     </div>
 
     <form id="quizForm">
+      <input type="hidden" id="session_id" value="{{ session_id }}">
+
       <div class="question">
         {% if entry["mode"] == "word" %}
 
@@ -171,6 +173,7 @@
   </div>
 
   <script src="{{url_for('static', filename='js/dark_theme_toggle.js')}}"></script>
+  <script src="{{url_for('static', filename='js/init.js')}}"></script>    
   <script src="{{url_for('static', filename='js/question.js')}}"></script>  
   <script>
 

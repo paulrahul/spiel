@@ -99,6 +99,24 @@ function handleExitLinkClick() {
     saveDataToLocalStorage();
 }
 
+function callNextLinkWithPossibleInit(nextUrl) {
+    $.ajax({
+        url: nextUrl,
+        method: 'GET',
+        success: function(response, textStatus, jqXHR) {
+            window.location.href = nextUrl;
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            if (jqXHR.status === 408) {
+                // Handle 408 error by navigating to the fallback URL
+                sessionInit(); // defined in init.js
+            } else {
+                console.error('Request failed:', textStatus, errorThrown);
+            }
+        }
+    });    
+}
+
 function handleNextLinkClick() {
     const radios = document.getElementsByName('order');
     let selectedValue;
@@ -133,12 +151,16 @@ function handleNextLinkClick() {
             }
         }
 
-
+        let redirectUrl = undefined;
         if (nextType != undefined && nextKey != undefined) {
-            window.location.href = "/next_question?order=serial&start="+nextKey+"&question_type="+nextType;
+            redirectUrl = "/next_question?order=serial&start="+nextKey+"&question_type="+nextType;
         } else {
-            window.location.href = "/next_question?order=serial";
+            redirectUrl = "/next_question?order=serial";
         }
+        
+        const sessionId = document.getElementById("session_id").value
+        // window.location.href = redirectUrl + "&session_id=" + sessionId;
+        callNextLinkWithPossibleInit(redirectUrl + "&session_id=" + sessionId);
 
         // let last = localStorage.getItem('last');
         // if (last != undefined) {
@@ -150,7 +172,7 @@ function handleNextLinkClick() {
         // }
     } else {
         localStorage.setItem('order', "random");
-        window.location.href = "/next_question";
+        redirectUrl = "/next_question";
     }
 }
 

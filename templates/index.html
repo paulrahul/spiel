@@ -59,37 +59,11 @@
     </div>
 
     <script src="{{url_for('static', filename='js/dark_theme_toggle.js')}}"></script>
+    <script src="{{url_for('static', filename='js/init.js')}}"></script>
     <script>
         function handlePlayClick() {
-            let unaskedSet = ["word", "preposition"];
-            localStorage.setItem("unasked", JSON.stringify(unaskedSet));
-
-            let storedData = localStorage.getItem('basicScores');
-            let start = localStorage.getItem('last');
-            const combinedObj = { ...JSON.parse(storedData), ...JSON.parse(start)};
-            const postData = JSON.stringify(combinedObj);
-
-            if (postData) {
-                $.ajax({
-                    url: '/seed_scores',
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: postData,
-                    success: function(response) {
-                        console.log('Scores seeded');
-                        // Do something with the response if needed
-                        window.location.href = response.redirect_url;
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Error:', error);
-                    }
-                });
-            } else {
-                console.log('No scores found in local storage.')
-                window.location.href = 'play';
-            }        
+            sessionInit();
         }
-
     </script>
 </body>
 </html>
