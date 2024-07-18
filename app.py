@@ -27,12 +27,17 @@ def create_app():
     def is_prod_mode():
         mode = app.config["SPIEL_MODE"]
         return mode is not None and mode == "PROD"
+
+    def validate_session_id():
+        session_id = request.args.get('session_id')
+        if not session_id or session_id != app.config["SESSION_ID"]:
+            return False
+        return True
     
-    def validate_session_id(f):
+    def dec_validate_session_id(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            session_id = request.args.get('session_id')
-            if not session_id or session_id != app.config["SESSION_ID"]:
+            if not validate_session_id():
                 return jsonify(error="Forbidden: Invalid session ID"), 408
             return f(*args, **kwargs)
         return decorated_function  
@@ -86,11 +91,19 @@ def create_app():
         return redirect(url_for('next_question'))
     
     @app.route("/next_question")
-    @validate_session_id
+    # @validate_session_id
     def next_question():
         query_param = request.args.get('order')
         try:
             if query_param is not None and query_param == "serial":
+                # TODO: Remove this shit code. We should have a 
+                # separate API called init or something which seeds 
+                # scores and returns the session ID. Redirection to
+                # next question should done by client itself after
+                # a successful init call. Adding this shit code now
+                # to fix regression in the Chrome extension.
+                if not validate_session_id():
+                    return jsonify(error="Forbidden: Invalid session ID"), 408
                 start_param = request.args.get('start')
                 question_type_param = request.args.get('question_type')
                 next_entry = spiel.get_next_entry(serial=True, start=start_param, mode=question_type_param)
