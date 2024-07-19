@@ -62,7 +62,23 @@
     <script src="{{url_for('static', filename='js/init.js')}}"></script>
     <script>
         function handlePlayClick() {
-            sessionInit();
+            let last = localStorage.getItem('last');
+            if (last) {
+                last = JSON.parse(last);
+
+                let queryParams = "";
+                let alreadyAdded = false;
+                for (const [key, value] of Object.entries(last)) {
+                    if (alreadyAdded) {
+                        queryParams += "&";
+                    }
+                    queryParams += key + "=" + value;
+                    alreadyAdded = true;
+                }
+                sessionInit('/next_question?' + queryParams);
+            } else {
+                sessionInit('/next_question?');
+            }
         }
     </script>
 </body>

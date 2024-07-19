@@ -30,7 +30,7 @@ def create_app():
 
     def validate_session_id():
         session_id = request.args.get('session_id')
-        if not session_id or session_id != app.config["SESSION_ID"]:
+        if session_id and session_id != app.config["SESSION_ID"]:
             return False
         return True
     
@@ -56,8 +56,8 @@ def create_app():
             "index.html",
             reloaded=True)
         
-    @app.route('/seed_scores', methods=['POST'])
-    def seed_scores():
+    @app.route('/init', methods=['POST'])
+    def init():
         # Receive the data sent in the POST request
         data = request.json
         
@@ -69,41 +69,31 @@ def create_app():
         # # Call the Python method to process the data
         # get_spiel().sort_words(scores)
         
-        if "type" in data and "key_" + data["type"] in data:
-            response = jsonify({'redirect_url': url_for('next_question', **{
-                "mode": "start",
-                "question_type": data["type"],
-                "start": data["key_" + data["type"]],
-                "order": "serial"
-            })})
-        else:
-            response = jsonify({'redirect_url': url_for('next_question', **{
-                "mode": "start"
-            })})
+        # if "type" in data and "key_" + data["type"] in data:
+        #     response = jsonify({'redirect_url': url_for('next_question', **{
+        #         "mode": "start",
+        #         "question_type": data["type"],
+        #         "start": data["key_" + data["type"]],
+        #         "order": "serial"
+        #     })})
+        # else:
+        #     response = jsonify({'redirect_url': url_for('next_question', **{
+        #         "mode": "start"
+        #     })})
         
-        session_id = app.config["SESSION_ID"]
-        response.headers['X-Session-ID'] = session_id
-        return response
-        # return redirect(url_for('next_question', **{"mode": "start"}))
+        data = {'session_id': app.config["SESSION_ID"]}
+        return jsonify(data), 200
         
     @app.route("/play")
     def play():
         return redirect(url_for('next_question'))
     
     @app.route("/next_question")
-    # @validate_session_id
+    @dec_validate_session_id
     def next_question():
         query_param = request.args.get('order')
         try:
             if query_param is not None and query_param == "serial":
-                # TODO: Remove this shit code. We should have a 
-                # separate API called init or something which seeds 
-                # scores and returns the session ID. Redirection to
-                # next question should done by client itself after
-                # a successful init call. Adding this shit code now
-                # to fix regression in the Chrome extension.
-                if not validate_session_id():
-                    return jsonify(error="Forbidden: Invalid session ID"), 408
                 start_param = request.args.get('start')
                 question_type_param = request.args.get('question_type')
                 next_entry = spiel.get_next_entry(serial=True, start=start_param, mode=question_type_param)
