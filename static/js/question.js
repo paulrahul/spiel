@@ -138,11 +138,10 @@ function handleNextLinkClick() {
                 nextType = unasked.values().next().value;
             }
         }
-        console.log(nextType);
 
         let nextKey = undefined;
         let last = localStorage.getItem('last');
-        if (last) {
+        if (last && nextType) {
             last = JSON.parse(last);
 
             let typeAttr = "key_" + nextType;
