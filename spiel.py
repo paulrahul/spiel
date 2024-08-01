@@ -21,7 +21,8 @@ PREPOSITIONS_FILE_NAME = "_prepositions.txt"
 GS_SHEET_NAME = "Vokabeln und Phrasen"
 
 class DeutschesSpiel:
-    def __init__(self, reload=False, use_semantic=False, use_multimode=False):
+    def __init__(self, reload=False, use_semantic=False, use_multimode=False,
+                 serial=False, mode=None, start=None):
         self.SPIEL_MODES = {
             "word": self._get_next_spiel_word,
             "preposition": self._get_next_preposition
@@ -30,6 +31,9 @@ class DeutschesSpiel:
         self._reload = reload
         self._use_semantic = use_semantic
         self._use_multimode = use_multimode
+        self._serial = serial
+        self._mode = mode
+        self._start = start
         
         self._rows = {}  # {"word":<word>, "de_to_en":<>, "translation":<>,...}
         self._spiel_dict = {} # {<word>: <original word entry>}
@@ -281,14 +285,51 @@ class DeutschesSpiel:
         similarity_score = find_similarity(answer, translation, self._use_semantic)
         score = normalized_score(similarity_score, self._use_semantic)
         return (correctness_string(score), score)
+    
+    def _log_score(self, key, score):
+        score_delta = 0 if score < 90 else 1
+        
+        num_rights = 0
+        num_attempts = 0
+        if key in self._basic_scores:
+            num_rights = self._basic_scores[key][0]
+            num_attempts = self._basic_scores[key][1]
+            
+        self._basic_scores[key] = (num_rights + score_delta, num_attempts + 1)
      
     def play_game(self):
+        start = self._start
+        mode = self._mode
+        
+        if self._serial:
+            if "last" not in self._basic_scores:
+                self._basic_scores["last"] = {}
+
+                if not mode:
+                    mode = "word"            
+                
+                if not start:
+                    start = self._rows[0]["word"]                
+            else:
+                if not mode:
+                    mode = self._basic_scores["last"]["type"]            
+                
+                if not start:
+                    start = self._basic_scores["last"]["key_" + mode]
+                                
         while True:
-            next_entry = self.get_next_entry(serial=True, start="Ereignis", mode="word")        
+            if start:
+                next_entry = self.get_next_entry(serial=True, start=start, mode=mode)
+                start = False
+            else:
+                next_entry = self.get_next_entry(serial=self._serial, mode=mode)
+
             entry = next_entry["value"]
-            
+            self._basic_scores["last"]["type"] = next_entry["mode"]            
+                
             if next_entry["mode"] == "word":
                 word = entry["word"]
+                self._basic_scores["last"]["key_" + next_entry["mode"]] = word
                 
                 user_answer = input(
                     Fore.CYAN + f'Was bedeutet {word}?: ' + Style.RESET_ALL).strip().lower()
@@ -301,10 +342,7 @@ class DeutschesSpiel:
                 else:
                     score = 0
                     
-                if word in self._basic_scores:
-                    self._basic_scores[word].append(score)
-                else:
-                    self._basic_scores[word] = [score]
+                self._log_score(word, score)    
                     
                 print(Fore.GREEN + f"\nEchte Antwort: {entry['translation'].upper()}" + Style.RESET_ALL + 
                     Back.GREEN + Style.BRIGHT + "\n\nExamples:" + Style.RESET_ALL)
@@ -315,6 +353,8 @@ class DeutschesSpiel:
 
             elif next_entry["mode"] == "preposition":
                 verb = entry["verb"]
+                self._basic_scores["last"]["key_" + next_entry["mode"]] = verb            
+                
                 user_preposition_answer = input(
                     Fore.CYAN + f'Welche Präposition soll mit {verb} verwendet werden?: ' + Style.RESET_ALL).strip().lower()
                 user_akkdat_answer = ""
@@ -338,9 +378,11 @@ class DeutschesSpiel:
                 else:
                     score = 0
                     
+                self._log_score(verb, score)    
+                                   
                 print(Fore.GREEN + f"\nEchte Antwort: {entry['verb']} {entry['preposition']} + {entry['akk_dat']}" + Style.RESET_ALL + 
                     Back.GREEN + Style.BRIGHT + "\n\nExamples:" + Style.RESET_ALL)                    
-            
+                
             if not prompt('\nWeiter?'):                    
                 print(f"\nThank You!!\n")
                 self.exit_game()
@@ -426,7 +468,12 @@ if __name__ == "__main__":
     parser.add_argument('--semantic', '-s', action='store_true', help='Enable semantic comparison')
     parser.add_argument('--scrape_new', action='store_true', help='Load new translations')
     parser.add_argument('--simulate', '-sm', action='store_true', help='Enable simulation mode')
-    parser.add_argument('--multi', '-m', action='store_true', help='Enable multi mode')      
+    parser.add_argument('--multi', '-m', action='store_true', help='Enable multi mode')
+    parser.add_argument('--serial', '-sl', action='store_true', help='Enable serial mode')
+    
+    parser.add_argument('-mode', type=str, help='Which mode to use')
+    parser.add_argument('-start', type=str, help='Starting word')
+
     args = parser.parse_args()
 
     if args.debug:
@@ -446,6 +493,10 @@ if __name__ == "__main__":
     if use_multimode:
         logger.info("Enabled use_multimode mode")
         
+    serial = args.serial
+    if serial:
+        logger.info("Enabled serial mode")
+        
     if args.scrape_new:
         api_key = None
         # Check if the environment variable exists
@@ -458,7 +509,8 @@ if __name__ == "__main__":
         compiler = Compiler(api_key, simulate)
         compiler.scrape_new(reload=True)
 
-    spiel = DeutschesSpiel(use_semantic=use_semantic, use_multimode=use_multimode)
+    spiel = DeutschesSpiel(use_semantic=use_semantic, use_multimode=use_multimode,
+                           serial=serial, start=args.start, mode=args.mode)
     if prompt('Möchtest du ein Spiel spielen?'):
         spiel.play_game()
     elif prompt('Möchtest du deine Notizen überarbeiten?'):

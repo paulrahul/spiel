@@ -30,11 +30,14 @@ function resetStats() {
 
 // Define your map data structure
 let basicScores = new Map();
+let basicScoresSimple = new Map();
 
 // Function to save data to localStorage
 function saveDataToLocalStorage() {
     localStorage.setItem('basicScores',
         JSON.stringify(Array.from(basicScores.entries())));
+    localStorage.setItem('basicScoresSimple',
+        JSON.stringify(Array.from(basicScoresSimple.entries())));
 
     localStorage.setItem('stats', JSON.stringify(stats));
       
@@ -46,6 +49,12 @@ function loadDataFromLocalStorage() {
     let storedData = localStorage.getItem('basicScores');
     if (storedData) {
         basicScores = new Map(JSON.parse(storedData));
+        console.log('Data loaded from localStorage.');
+    }
+
+    let scoreData = localStorage.getItem('basicScoresSimple');
+    if (scoreData) {
+        basicScoresSimple = new Map(JSON.parse(scoreData));
         console.log('Data loaded from localStorage.');
     }
 
@@ -99,17 +108,20 @@ function handleExitLinkClick() {
     saveDataToLocalStorage();
 }
 
-function callNextLinkWithPossibleInit(nextUrl) {
+function callNextLinkWithPossibleInit(nextUrl, sessionId) {
     $.ajax({
-        url: nextUrl,
+        url: nextUrl + "&session_id=" + sessionId,
         method: 'GET',
         success: function(response, textStatus, jqXHR) {
-            window.location.href = nextUrl;
+            window.location.href = nextUrl + "&session_id=" + sessionId;
         },
         error: function(jqXHR, textStatus, errorThrown) {
             if (jqXHR.status === 408) {
                 // Handle 408 error by navigating to the fallback URL
-                sessionInit(); // defined in init.js
+                // We need to re-init here to get the new session ID (thereby)
+                // connecting to the new server, and hence, the nextURL must
+                // have the last word, preposition etc. information.
+                initWithLastInformation();
             } else {
                 console.error('Request failed:', textStatus, errorThrown);
             }
@@ -159,7 +171,7 @@ function handleNextLinkClick() {
         
         const sessionId = document.getElementById("session_id").value
         // window.location.href = redirectUrl + "&session_id=" + sessionId;
-        callNextLinkWithPossibleInit(redirectUrl + "&session_id=" + sessionId);
+        callNextLinkWithPossibleInit(redirectUrl, sessionId);
 
         // let last = localStorage.getItem('last');
         // if (last != undefined) {
@@ -204,14 +216,29 @@ document.querySelectorAll('.next-link').forEach(function(nextLink) {
 setInterval(periodicSaveData, 2 * 60 * 1000); // 2 minutes in milliseconds
 
 function updateWordScore(word, score) {
-    if (basicScores.has(word)) {
-        // If the key exists, retrieve the existing list and append the new value to it
-        let existingList = basicScores.get(word);
-        existingList.push(score);
-        basicScores.set(word, existingList); // Update the value for the key in the map
+    // if (basicScores.has(word)) {
+    //     // If the key exists, retrieve the existing list and append the new value to it
+    //     let existingList = basicScores.get(word);
+    //     existingList.push(score);
+    //     basicScores.set(word, existingList); // Update the value for the key in the map
+    // } else {
+    //     // If the key doesn't exist, create a new list with the new value and set it as the value for the key
+    //     basicScores.set(word, [score]);
+    // }
+
+    let scoreDelta = 0;
+    if (score >= 90) {
+        scoreDelta = 1;
+    }
+    // basicScoresSimple format: (word) -> [num_right, total_attempts]
+    if (basicScoresSimple.has(word)) {
+        let existingScores = basicScoresSimple.get(word);
+        existingScores[0] += scoreDelta;
+        existingScores[1]++;
+        basicScoresSimple.set(word, existingScores); // Update the value for the key in the map
+
     } else {
-        // If the key doesn't exist, create a new list with the new value and set it as the value for the key
-        basicScores.set(word, [score]);
+        basicScoresSimple.set(word, [scoreDelta, 1])  // score, 1 attempt
     }
 
     incrementStats();

@@ -69,14 +69,14 @@ def fix_dump_rows():
         print("No rows found in spreadsheet")
     else:
         word_map = {}
-        for row in rows:
+        for idx, row in enumerate(rows):
             word = None
             if row["Deutsch"].strip() != '':
                 word = row["Deutsch"].strip()
             elif row["Englisch"].strip() != '':
                 word = row["Englisch"].strip()
             
-            word_map[word] = {}
+            word_map[word] = {"idx": idx}
             if row["Bedeutung"].strip() != '':
                 if word is not None:
                     word_map[word]["bedeutung"] = row["Bedeutung"].strip()
@@ -91,16 +91,14 @@ def fix_dump_rows():
 
         # Modify
         extra_dump_words = set()
-        new_data = []
+        new_data = [None] * len(rows)
         for row in existing_data:
             word = row["word"]
             
             if word not in word_map:
                 extra_dump_words.add(word)
                 continue
-            
-            word_map[word]["both"] = True
-            
+                        
             if "bedeutung" in word_map[word]:
                 translation = word_map[word]["bedeutung"]
                 if translation != row["translation"]:
@@ -114,14 +112,25 @@ def fix_dump_rows():
                 
                 row["synonyms"] = word_map[word]["synonyms"]
                 
-            new_data.append(row)
+            idx = word_map[word]["idx"]
+            new_data[idx] = row
+
+        print(f"Words found in GS but not in dump file. These words most likely need to be corrected. :")
+        for word in word_map:
+            idx = word_map[word]["idx"]
+            try:
+                if new_data[idx] is None:
+                    print(word)
+                    # del(new_data[idx])
+            except Exception as e:
+                print(f"{word} failed in {idx}")
+                raise
+        
+        print(f"Words found in dump file but not in GS:\n{extra_dump_words}")
 
         # Write the updated list back to the file
         with open(DUMP_FILE_PATH, 'w') as file:
             json.dump(new_data, file)
-        
-        print(f"Words found in GS but not in dump file. These words most likely need to be corrected. :\n{[word for word in word_map if 'both' not in word_map[word]]}")
-        print(f"Words found in dump file but not in GS:\n{extra_dump_words}")
             
 def dedupe():
     with open(DUMP_FILE_PATH, 'r') as file:
@@ -129,7 +138,10 @@ def dedupe():
         
     written_words = {}
     new_data = []
-    for row in existing_data:  
+    for row in existing_data:
+        if row is None:
+            continue
+                  
         word = row["word"]
       
         keys = ["word", "de_to_en", "translation", "examples", "metadata", "synonyms"]
