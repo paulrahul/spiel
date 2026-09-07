@@ -1,174 +1,188 @@
-import os, sys
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-
-from flask import Flask, abort, redirect, render_template, request, url_for, jsonify
-from flask_cors import CORS
-from functools import wraps
-from werkzeug.utils import redirect
+import os
 import uuid
+from pathlib import Path
 
-from .spiel import DeutschesSpiel
-# from .translation_compiler import Compiler
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
+try:
+    from .spiel import DeutschesSpiel
+except ImportError:
+    # Support `uvicorn app:app` and `python app.py` from the project root.
+    from spiel import DeutschesSpiel
+
+
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
 spiel = DeutschesSpiel(use_semantic=False, use_multimode=True)
 
-# Generate a unique session ID when the server starts
+
+class InvalidSessionError(Exception):
+    pass
+
+
 def _generate_session_id():
     return str(uuid.uuid4())
 
-def create_app():
-    app = Flask(__name__)
-    
-    CORS(app)
 
-    app.config.from_mapping(
-        DEEPL_KEY = os.environ.get("DEEPL_KEY"),
-        SPIEL_MODE = os.environ.get("SPIEL_MODE"),
-        SESSION_ID = _generate_session_id()
+def _validate_session_id(request: Request):
+    session_id = request.query_params.get("session_id")
+    if session_id and session_id != request.app.state.session_id:
+        raise InvalidSessionError
+
+
+def create_app():
+    app = FastAPI(title="Deutsches Spiel")
+    app.state.deepl_key = os.environ.get("DEEPL_KEY")
+    app.state.spiel_mode = os.environ.get("SPIEL_MODE")
+    app.state.session_id = _generate_session_id()
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
+    app.mount(
+        "/static",
+        StaticFiles(directory=BASE_DIR / "static"),
+        name="static")
+
+    @app.exception_handler(InvalidSessionError)
+    def invalid_session_handler(request: Request, exc: InvalidSessionError):
+        return JSONResponse(
+            status_code=408,
+            content={"error": "Forbidden: Invalid session ID"})
 
     def is_prod_mode():
-        mode = app.config["SPIEL_MODE"]
-        return mode is not None and mode == "PROD"
+        return app.state.spiel_mode == "PROD"
 
-    def validate_session_id():
-        session_id = request.args.get('session_id')
-        if session_id and session_id != app.config["SESSION_ID"]:
-            return False
-        return True
+    def lookup_words():
+        return sorted(word.capitalize() for word in spiel.list())
 
-    def dec_validate_session_id(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not validate_session_id():
-                return jsonify(error="Forbidden: Invalid session ID"), 408
-            return f(*args, **kwargs)
-        return decorated_function  
+    @app.get("/", response_class=HTMLResponse)
+    def index(request: Request):
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={"prod_mode": is_prod_mode()})
 
-    @app.route("/")
-    def index():
-        return render_template(
-            "index.html",
-            prod_mode=is_prod_mode())
+    @app.post("/init")
+    def initialize_session():
+        return {"session_id": app.state.session_id}
 
-    # @app.route("/reload")
-    # def reload():
-    #     compiler = Compiler(app.config["DEEPL_KEY"])
-    #     compiler.scrape_new(reload=True)
-    #     return render_template(
-    #         "index.html",
-    #         reloaded=True)
+    @app.get("/play")
+    def play(request: Request):
+        return RedirectResponse(
+            url=str(request.url_for("next_question")),
+            status_code=302)
 
-    @app.route('/init', methods=['POST'])
-    def init():
-        # Receive the data sent in the POST request
-        data = request.json
-        
-        # # convert to map
-        # scores = {}
-        # for row in data:
-        #     scores[row[0]] = row[1]
-        
-        # # Call the Python method to process the data
-        # get_spiel().sort_words(scores)
-        
-        # if "type" in data and "key_" + data["type"] in data:
-        #     response = jsonify({'redirect_url': url_for('next_question', **{
-        #         "mode": "start",
-        #         "question_type": data["type"],
-        #         "start": data["key_" + data["type"]],
-        #         "order": "serial"
-        #     })})
-        # else:
-        #     response = jsonify({'redirect_url': url_for('next_question', **{
-        #         "mode": "start"
-        #     })})
-        
-        data = {'session_id': app.config["SESSION_ID"]}
-        return jsonify(data), 200
-
-    @app.route("/play")
-    def play():
-        return redirect(url_for('next_question'))
-    
-    @app.route("/next_question")
-    @dec_validate_session_id
-    def next_question():
-        query_param = request.args.get('order')
+    @app.get(
+        "/next_question",
+        response_class=HTMLResponse,
+        dependencies=[Depends(_validate_session_id)])
+    def next_question(request: Request):
+        order = request.query_params.get("order")
         try:
-            if query_param is not None and query_param == "serial":
-                start_param = request.args.get('start')
-                question_type_param = request.args.get('question_type')
-                next_entry = spiel.get_next_entry(serial=True, start=start_param, mode=question_type_param)
+            if order == "serial":
+                next_entry = spiel.get_next_entry(
+                    serial=True,
+                    start=request.query_params.get("start"),
+                    mode=request.query_params.get("question_type"))
             else:
                 next_entry = spiel.get_next_entry(serial=False)
         except Exception as e:
-            abort(400, description=f"Error: {e}")            
-        
+            raise HTTPException(status_code=400, detail=f"Error: {e}") from e
+
         next_question = next_entry["value"]
         next_question["mode"] = next_entry["mode"]
-        
+
         start = False
-        query_param = request.args.get('mode')
-        if query_param is not None:
-            if query_param == "json":                
-                data = {'next_question': next_question}
-                return jsonify(data), 200
-            elif query_param == "start":
+        response_mode = request.query_params.get("mode")
+        if response_mode is not None:
+            if response_mode == "json":
+                return JSONResponse(content={"next_question": next_question})
+            if response_mode == "start":
                 start = True
             else:
-                abort(400, description=f"Invalid query parameter value: {query_param}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid query parameter value: {response_mode}")
 
-        return render_template(
-            "question.html",
-            start=start,
-            entry=next_question,
-            session_id=app.config["SESSION_ID"])
-      
-    @app.route("/lookup")
-    def lookup():
-        query_param = request.args.get('wort')
-        result = None
-        if query_param:
-            result = spiel.lookup(query_param)
+        return templates.TemplateResponse(
+            request=request,
+            name="question.html",
+            context={
+                "start": start,
+                "entry": next_question,
+                "session_id": app.state.session_id,
+            })
 
-        is_json = request.args.get('mode') == "json"
-        if is_json:
-            if result is None:
-                return jsonify({'examples': []}), 200            
-            
-            data = {'examples': result['examples']}
-            return jsonify(data), 200
-        else:
-            return render_template(
-                "lookup.html",
-                word=query_param,
-                entry=result)
+    @app.get("/lookup", response_class=HTMLResponse)
+    def lookup(request: Request):
+        is_list_mode = (
+            "list" in request.query_params or
+            request.query_params.get("mode") == "list")
+        if is_list_mode:
+            word_list = lookup_words()
+            word = word_list[0] if word_list else None
+            return templates.TemplateResponse(
+                request=request,
+                name="lookup.html",
+                context={
+                    "mode": "list",
+                    "word": word,
+                    "entry": spiel.lookup(word) if word else None,
+                    "selected_word": word,
+                })
 
-    @app.route("/list")
-    def list():
-        word_list = spiel.list()
-        word_list = [word.capitalize() for word in word_list]
-        return jsonify(sorted(word_list)), 200
-     
-    @app.route("/answer_score")
-    def answer_score():
-        user_answer = request.args.get('answer')
-        translation = request.args.get('translation')
-        (score_string, score) = get_spiel().get_answer_score(
-            user_answer, translation)
-        data = {'score_string': score_string, 'score': score}
-        return jsonify(data), 200
+        word = request.query_params.get("wort")
+        result = spiel.lookup(word) if word else None
 
-    @app.route("/exit")
-    def exit():
-        # get_spiel().exit_game()
-        return redirect(url_for('index'))
-    
-    def get_spiel():
-        return spiel
+        if request.query_params.get("mode") == "json":
+            return JSONResponse(
+                content={"examples": result["examples"] if result else []})
+
+        return templates.TemplateResponse(
+            request=request,
+            name="lookup.html",
+            context={
+                "mode": "wort",
+                "word": word,
+                "entry": result,
+                "selected_word": word,
+            })
+
+    @app.get("/list")
+    def list_words():
+        return lookup_words()
+
+    @app.get("/answer_score")
+    def answer_score(request: Request):
+        answer = request.query_params.get("answer")
+        translation = request.query_params.get("translation")
+        score_string, score = spiel.get_answer_score(answer, translation)
+        return {"score_string": score_string, "score": score}
+
+    @app.get("/exit")
+    def exit_game(request: Request):
+        return RedirectResponse(
+            url=str(request.url_for("index")),
+            status_code=302)
 
     return app
 
+
+app = create_app()
+
+
 if __name__ == "__main__":
-    create_app().run(port=os.environ.get("SPIEL_PORT"))
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=int(os.environ.get("SPIEL_PORT", "8000")))

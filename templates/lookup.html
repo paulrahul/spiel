@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  {% set is_found = False %}
-  
-  {% if entry is none %}
+  {% set is_found = entry is not none %}
+  {% if mode == "list" %}
+    <title>Alle Wörter</title>
+  {% elif not is_found %}
     <title>Dein Wort konnte nicht gefunden werden</title>
   {% else %}
-    {% set is_found = True %}
     <title>Dein Wort: {{ word }}</title>
   {% endif %}
   <style>
@@ -60,6 +60,16 @@
         font-weight: bold;
       }
 
+      .grammar_container {
+        margin-top: 20px;
+        text-align: left;
+      }
+
+      .grammar_container h4,
+      .grammar_container p {
+        margin: 0 0 10px;
+      }
+
       #json-container {
         margin-top: 20px;
         white-space: pre-wrap;   /* Wrap text */
@@ -77,7 +87,7 @@
 
   </style>
 
-  <link rel="stylesheet" href="{{url_for('static', filename='css/dark_theme_toggle.css')}}"> 
+  <link rel="stylesheet" href="{{url_for('static', path='/css/dark_theme_toggle.css')}}">
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
@@ -118,17 +128,44 @@
                           optionElement.textContent = option;
                           document.getElementById('options').appendChild(optionElement);
                       });
+
+                      const selectedOption = data.find(option =>
+                          option.localeCompare(selectedWord, undefined, {
+                              sensitivity: 'accent'
+                          }) === 0) || (isListMode ? data[0] : null);
+                      if (selectedOption) {
+                          document.getElementById('options').value = selectedOption;
+                      }
                   });
           </script>
       </select>
 
     </div>
 
+    {% if is_found %}
     <div id="result">
 
       {% set synonyms = entry["synonyms"] %}
       {% if synonyms != '' %}
         <h4>Synonyme: {{ entry["synonyms"] }}</h4>
+      {% endif %}
+
+      {% if entry is not none %}
+        {% set grammar = entry.get("grammar", "") %}
+        {% if grammar %}
+          <div class="grammar_container">
+            <h4>Grammatik</h4>
+            <p>
+              {%- for part in grammar.split("**") -%}
+                {%- if loop.index0 is odd -%}
+                  <strong>{{ part }}</strong>
+                {%- else -%}
+                  {{ part }}
+                {%- endif -%}
+              {%- endfor -%}
+            </p>
+          </div>
+        {% endif %}
       {% endif %}
       
       <div class="examples_container">
@@ -144,6 +181,7 @@
       </div>
 
     </div>
+    {% endif %}
 
     <div class="links">
       <a href="#" class="raw-link" data-variable="{{ entry }}">Raw</a>
@@ -152,7 +190,7 @@
     </div>
   </div>
 
-  <script src="{{url_for('static', filename='js/dark_theme_toggle.js')}}"></script>
+  <script src="{{url_for('static', path='/js/dark_theme_toggle.js')}}"></script>
   <script>
 
     document.querySelectorAll('.raw-link').forEach(function(rawLink) {
@@ -165,13 +203,54 @@
       });
     });
 
-    document.getElementById('options').addEventListener('change', function() {
-      const selectedValue = this.value;
-      window.location.href = "/lookup?wort=" + selectedValue;
+    const optionsSelect = document.getElementById('options');
+    const isListMode = {{ (mode == "list") | tojson }};
+    const selectedWord = {{ selected_word | default('', true) | tojson }};
+
+    function showWord(word) {
+      window.location.href = "/lookup?wort=" + encodeURIComponent(word);
+    }
+
+    optionsSelect.addEventListener('change', function() {
+      if (this.value) {
+        showWord(this.value);
+      }
+    });
+
+    function navigateWord(direction) {
+      const words = Array.from(optionsSelect.options)
+        .filter(option => !option.disabled && option.value);
+      if (words.length === 0) {
+        return;
+      }
+
+      let index = words.findIndex(option => option.value === optionsSelect.value);
+      if (index === -1) {
+        index = 0;
+      } else {
+        index = (index + direction + words.length) % words.length;
+      }
+      showWord(words[index].value);
+    }
+
+    document.addEventListener('keydown', function(event) {
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      if (event.target.matches('input, textarea')) {
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        navigateWord(1);
+      } else if (event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        navigateWord(-1);
+      }
     });
 
   </script>
 
 </body>
 </html>
-

@@ -1,6 +1,3 @@
-from gevent import monkey
-monkey.patch_all()
-
 from colorama import Back, Fore, Style
 import json
 import math

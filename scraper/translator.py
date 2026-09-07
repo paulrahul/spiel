@@ -10,6 +10,8 @@ class Translator:
         
         self._de_to_en_texts = []
         self._en_to_de_texts= []
+        self._de_to_en_call_count = 0
+        self._en_to_de_call_count = 0
         
         self._translator = None
 
@@ -20,13 +22,16 @@ class Translator:
     
     def translate_from_deutsch(self, german_text):
         pass
+
+    def translate_many_from_deutsch(self, german_texts):
+        pass
     
     def translate_from_englisch(self, english_text):
         pass
     
     def api_call_count(self):
-        n1 = len(self._de_to_en_texts)
-        n2 = len(self._en_to_de_texts)
+        n1 = self._de_to_en_call_count
+        n2 = self._en_to_de_call_count
         nc1 = sum(len(s) for s in self._de_to_en_texts)
         nc2 = sum(len(s) for s in self._en_to_de_texts)        
         
@@ -52,16 +57,34 @@ class DeeplTranslator(Translator):
         response = self._translator.translate_text(
             source_lang="de", target_lang="en-us", text=german_text)
         
+        self._de_to_en_call_count += 1
         self._de_to_en_texts.append(german_text)
         logger.debug(f"Fetched translation {response.text} for {german_text}")
 
         return response.text
+
+    def translate_many_from_deutsch(self, german_texts):
+        german_texts = list(german_texts)
+        if not german_texts:
+            return []
+
+        responses = self._translator.translate_text(
+            source_lang="de", target_lang="en-us", text=german_texts)
+
+        self._de_to_en_call_count += 1
+        self._de_to_en_texts.extend(german_texts)
+        translations = [response.text for response in responses]
+        logger.debug(
+            f"Fetched {len(translations)} translations in one DeepL request")
+
+        return translations
     
     def translate_from_englisch(self, english_text):
         # Translate the English text to German
         response = self._translator.translate_text(
             source_lang="en", target_lang="de", text=english_text)
         
+        self._en_to_de_call_count += 1
         self._en_to_de_texts.append(english_text)
         logger.debug(f"Fetched translation {response.text} for {english_text}")
 
@@ -74,12 +97,26 @@ class MockTranslator(Translator):
             
     def translate_from_deutsch(self, german_text):       
         logger.debug(f"Mock DE_to_EN translation called for {german_text}")
+        self._de_to_en_call_count += 1
         self._de_to_en_texts.append(german_text)
 
         return MOCK_RESPONSE_TEXT
+
+    def translate_many_from_deutsch(self, german_texts):
+        german_texts = list(german_texts)
+        if not german_texts:
+            return []
+
+        logger.debug(
+            f"Mock batch DE_to_EN translation called for {german_texts}")
+        self._de_to_en_call_count += 1
+        self._de_to_en_texts.extend(german_texts)
+
+        return [MOCK_RESPONSE_TEXT] * len(german_texts)
     
     def translate_from_englisch(self, english_text):
         logger.debug(f"Mock EN_to_DE translation called for {english_text}")
+        self._en_to_de_call_count += 1
         self._en_to_de_texts.append(english_text)
 
         return MOCK_RESPONSE_TEXT

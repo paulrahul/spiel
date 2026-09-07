@@ -67,7 +67,7 @@
       }
   </style>
   
-  <link rel="stylesheet" href="{{url_for('static', filename='css/dark_theme_toggle.css')}}"> 
+  <link rel="stylesheet" href="{{url_for('static', path='/css/dark_theme_toggle.css')}}">
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
@@ -172,9 +172,9 @@
     </div>
   </div>
 
-  <script src="{{url_for('static', filename='js/dark_theme_toggle.js')}}"></script>
-  <script src="{{url_for('static', filename='js/init.js')}}"></script>    
-  <script src="{{url_for('static', filename='js/question.js')}}"></script>  
+  <script src="{{url_for('static', path='/js/dark_theme_toggle.js')}}"></script>
+  <script src="{{url_for('static', path='/js/init.js')}}"></script>
+  <script src="{{url_for('static', path='/js/question.js')}}"></script>
   <script>
 
     document.getElementById('quizForm').addEventListener('submit', function(e) {
@@ -239,4 +239,3 @@
   </script>
 </body>
 </html>
-

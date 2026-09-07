@@ -1,3 +1,7 @@
 *.txt
 *.yaml
 *.pyc
+.env
+.venv
+.DS_Store
+*-workspace

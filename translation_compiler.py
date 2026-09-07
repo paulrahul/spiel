@@ -1,6 +1,8 @@
 # from gevent import monkey
 # monkey.patch_all()
+import argparse
 import gevent
+from gevent.event import Event
 
 from functools import partial
 import json
@@ -19,6 +21,7 @@ import util
 DUMP_FILE_NAME =  "_dump.txt"
 SCRAPE_QUEUE_FILE_NAME = "_scrape_queue.txt"
 INCORRECT_WORDS_FILE_NAME = "_to_be_fixed.txt"
+DUMP_BATCH_SIZE = 15
 
 DEEPL_KEY_VAR = "DEEPL_KEY"
 
@@ -47,7 +50,8 @@ class Compiler:
         # Step 1. Read word list.
         fetched = self._fetch_glossary(fetch_from_google_sheet=reload)
         if not fetched:
-            logger.critical("Fetching glossary failed", exc_info=1) 
+            logger.critical("Fetching glossary failed", exc_info=1)
+            return
         
         # Step 2. Build scrape list.
         if reload or not util.file_exists(SCRAPE_QUEUE_FILE_NAME):
@@ -67,6 +71,9 @@ class Compiler:
     
     def _translate_de_to_en(self, word):
         return self._translator.translate_from_deutsch(word)
+
+    def _translate_many_de_to_en(self, texts):
+        return self._translator.translate_many_from_deutsch(texts)
     
     def _translate_en_to_de(self, word):
         return self._translator.translate_from_englisch(word)
@@ -75,15 +82,32 @@ class Compiler:
         k = source_greenlet.name
         v = source_greenlet.value
         scrape_entry[k] = v
+
+        if source_greenlet.exception is not None:
+            scrape_entry["incorrect"] = True
+            logger.error(
+                f"Fetching {k} for {scrape_word} failed: "
+                f"{source_greenlet.exception}")
+        elif v is None and not self._simulation:
+            scrape_entry["incorrect"] = True
+            logger.error(f"Fetching {k} for {scrape_word} returned no result")
+
         logger.debug(f"Set {k} to {v} for {scrape_word}")
         
         if "translation" in scrape_entry and "file" in scrape_entry:
             logger.debug(f"Both keys set for {scrape_word}")
-        
+
+            def combine_scrape_data():
+                try:
+                    self._combine_scrape_data(scrape_word, scrape_entry)
+                except Exception as e:
+                    scrape_entry["incorrect"] = True
+                    logger.exception(
+                        f"Combining fetched data for {scrape_word} failed: {e}")
+
             t = threading.Thread(
-                target=self._combine_scrape_data,
-                name=scrape_word,
-                args=(scrape_word, scrape_entry,))
+                target=combine_scrape_data,
+                name=scrape_word)
             t.start()
             t.join()
             
@@ -92,8 +116,12 @@ class Compiler:
     def _combine_scrape_data(self, scrape_word, scrape_entry):
         scrape_entry["examples"] = []
         scrape_entry["metadata"] = []
+        scrape_entry["grammar"] = ""
 
-        scrape_entry["incorrect"] = False
+        scrape_entry.setdefault("incorrect", False)
+        if scrape_entry["incorrect"]:
+            return
+
         if scrape_entry['file'] is None:
             scrape_entry["incorrect"] = True
             logger.warning(f"No scrape file for {scrape_word} found")
@@ -104,31 +132,107 @@ class Compiler:
             with open(file_name, 'r') as file:
                 scrape_contents = json.load(file)
         except (FileNotFoundError, json.JSONDecodeError) as e:
+            scrape_entry["incorrect"] = True
             logger.error(f"File {file_name} not found for parsing.")
             return
 
         examples = self._parser.parse_examples(scrape_contents)
+        scrape_entry["grammar"] = self._parse_grammar(scrape_contents)
         
-        # Invoke greenlets to fetch the translations of the examples.
-        greenlets = []
-        idx = 0
-        for eg in examples:
-            g = gevent.spawn(self._translate_de_to_en, eg)
-            g.name = str(idx)
-            greenlets.append(g)
-            idx += 1
-            
-        greenlets = gevent.joinall(greenlets, timeout=10)
-        
-        compiled_examples = []
-        for g in greenlets:
-            idx = int(g.name)
-            compiled_examples.append((examples[idx], g.value))
-            
-        scrape_entry["examples"] = compiled_examples
+        try:
+            translated_examples = self._translate_many_de_to_en(examples)
+        except Exception as e:
+            scrape_entry["incorrect"] = True
+            logger.error(
+                f"Fetching example translations for {scrape_word} failed: {e}")
+            return
+
+        if len(translated_examples) != len(examples):
+            scrape_entry["incorrect"] = True
+            logger.error(
+                f"DeepL returned {len(translated_examples)} of {len(examples)} "
+                f"example translations for {scrape_word}")
+            return
+
+        if not self._simulation and any(
+                translation is None for translation in translated_examples):
+            scrape_entry["incorrect"] = True
+            logger.error(
+                f"Fetching example translations for {scrape_word} "
+                "returned an empty result")
+            return
+
+        scrape_entry["examples"] = list(zip(examples, translated_examples))
         
         genus = self._parser.parse_genus(examples, scrape_word)
         scrape_entry["metadata"] = {"genus": genus}
+
+    @staticmethod
+    def _parse_grammar(scrape_contents):
+        if isinstance(scrape_contents, dict):
+            return scrape_contents.get("grammar", "")
+
+        for item in reversed(scrape_contents):
+            if isinstance(item, dict) and "grammar" in item:
+                return item["grammar"]
+
+        return ""
+
+    @staticmethod
+    def backfill_existing_grammar():
+        """Refresh grammar in every scrape cache without calling DeepL."""
+        crawler = CrawlerFactory.get_crawler("dwds")
+        words = crawler.existing_crawl_words()
+        grammar_by_word = {}
+        failed_words = []
+
+        logger.info(f"Backfilling grammar for {len(words)} existing scrape files")
+        for index, word in enumerate(words, start=1):
+            grammar = crawler.backfill_grammar(word)
+            if grammar is None:
+                failed_words.append(word)
+            else:
+                grammar_by_word[word] = grammar
+
+            if index % DUMP_BATCH_SIZE == 0 or index == len(words):
+                logger.info(f"Processed grammar for {index}/{len(words)} files")
+
+        updated_dump_entries = 0
+        try:
+            with open(DUMP_FILE_NAME, 'r') as file:
+                dump_entries = json.load(file)
+
+            for entry in dump_entries:
+                if not isinstance(entry, dict):
+                    continue
+
+                word = entry.get("word")
+                if word in grammar_by_word:
+                    entry["grammar"] = grammar_by_word[word]
+                    updated_dump_entries += 1
+
+            with open(DUMP_FILE_NAME, 'w') as file:
+                json.dump(dump_entries, file)
+        except FileNotFoundError:
+            logger.warning(
+                f"Compiled dump {DUMP_FILE_NAME} was not found; "
+                "only scrape files were updated")
+        except (OSError, json.JSONDecodeError) as e:
+            logger.error(f"Updating compiled dump {DUMP_FILE_NAME} failed: {e}")
+
+        if failed_words:
+            util.append_to_file(INCORRECT_WORDS_FILE_NAME, failed_words)
+
+        logger.info(
+            f"Grammar backfill complete: {len(grammar_by_word)} scrape files "
+            f"updated, {updated_dump_entries} compiled entries updated, "
+            f"{len(failed_words)} failures")
+
+        return {
+            "scrape_files": len(grammar_by_word),
+            "dump_entries": updated_dump_entries,
+            "failed_words": failed_words,
+        }
     
     def _scrape_and_translate(self):
         try:
@@ -139,10 +243,26 @@ class Compiler:
             return
 
         events = []
+        event_entries = {}
+        completed_entries = {}
+
+        def add_completed(word, entry):
+            if entry.get("incorrect", False):
+                # Failures should be available for manual correction as soon as
+                # they are known; they do not count toward the success batch.
+                self._dump_metadata({word: entry})
+                return
+
+            completed_entries[word] = entry
+            if len(completed_entries) >= DUMP_BATCH_SIZE:
+                self._dump_metadata(completed_entries)
+                completed_entries.clear()
+
         for scrape_word, scrape_entry in to_be_scraped_queue.items():
             if scrape_entry['de_to_en']:
-                event = gevent.event.Event()
+                event = Event()
                 events.append(event)
+                event_entries[event] = (scrape_word, scrape_entry)
                 
                 greenlet1 = gevent.spawn(self._scrape_de_to_en, scrape_word)
                 greenlet1.name = "file"
@@ -160,11 +280,24 @@ class Compiler:
             else:  # en to de
                 # First get the German translation, then do the usual scraping
                 # as is done for German words.
-                if "translation" not in scrape_entry:                            
-                    translation = self._translate_en_to_de(scrape_word)
-                    scrape_entry["translation"] = translation
+                scrape_entry["incorrect"] = False
+                try:
+                    if "translation" not in scrape_entry:
+                        translation = self._translate_en_to_de(scrape_word)
+                        scrape_entry["translation"] = translation
+                        if translation is None and not self._simulation:
+                            scrape_entry["incorrect"] = True
+                            logger.error(
+                                f"Fetching translation for {scrape_word} "
+                                "returned no result")
+                except Exception as e:
+                    scrape_entry["incorrect"] = True
+                    logger.error(
+                        f"Fetching translation for {scrape_word} failed: {e}")
 
-                # event = gevent.event.Event()
+                add_completed(scrape_word, scrape_entry)
+
+                # event = Event()
                 # events.append(event)
                 # greenlet = gevent.spawn(self._scrape_de_to_en, translation)
                 # greenlet.name = "file"
@@ -173,10 +306,15 @@ class Compiler:
                 #     translation, scrape_entry, event))
                 
                           
-        gevent.wait(events)
+        for completed_event in gevent.iwait(events):
+            scrape_word, scrape_entry = event_entries[completed_event]
+            add_completed(scrape_word, scrape_entry)
+
+        # Persist the final partial batch as well.
+        if completed_entries:
+            self._dump_metadata(completed_entries)
         
         self._translator.get_translator_call_stats()
-        self._dump_metadata(to_be_scraped_queue)
         self._write_translations_to_gs(to_be_scraped_queue)
                 
     def _dump_metadata(self, scraped_entries):
@@ -189,6 +327,7 @@ class Compiler:
             
             examples = entry["examples"] if entry["de_to_en"] else []
             metadata = entry["metadata"] if entry["de_to_en"] else []
+            grammar = entry["grammar"] if entry["de_to_en"] else ""
             
             logger.debug(f"Adding {word} to dump.")
             
@@ -197,20 +336,23 @@ class Compiler:
                 "de_to_en": entry["de_to_en"],
                 "translation": entry["translation"],
                 "examples": examples,
+                "grammar": grammar,
                 "metadata": metadata,
                 "synonyms": entry["synonyms"]
             })
         
-        if not self._simulation:    
-            util.append_to_file(DUMP_FILE_NAME, dump_entries)
+        if not self._simulation and dump_entries:
+            util.upsert_to_file(DUMP_FILE_NAME, dump_entries, key="word")
             
-        if not len(incorrect_words) > 0:
+        if not self._simulation and incorrect_words:
             util.append_to_file(INCORRECT_WORDS_FILE_NAME, incorrect_words)
                     
     def _prepare_for_scrape(self):  
         if self._gs_entries is None or len(self._gs_entries) == 0:
             logger.debug("No new entries from Google Spreadsheet")
             return
+
+        dumped_words = self._load_dumped_words()
         
         # Schedule scraping for any word in GS not having a translation.
         to_be_scraped_queue = {}
@@ -231,14 +373,25 @@ class Compiler:
                 de_to_en = True
             else:
                 word = word2
-                
+
+            if word is None:
+                logger.warning(
+                    "Skipping Google Sheets row with neither Deutsch nor "
+                    f"Englisch set: {row}")
+                continue
+
+            if word.casefold() in dumped_words:
+                logger.debug(f"{word} is already present in the compiled dump.")
+                continue
+
             if row["Bedeutung"].strip() == '':
                 logger.info(f"{word} has no Bedeutung, hence translating.")
             elif de_to_en and not self._crawler.crawl_file_exists(word):
                 logger.info(f"{word} has no scrape file, hence scraping.")
             else:
-                logger.debug(f"{word} already has a Bedeutung filled in and is scraped.")
-                continue                
+                logger.info(
+                    f"{word} is missing from the compiled dump; "
+                    "reusing its existing translation and scrape file.")
                                 
             synonyms = ""
             if row["Synonyms"].strip() != '':
@@ -252,10 +405,25 @@ class Compiler:
                 to_be_scraped_queue[word]["translation"] = row["Bedeutung"].strip()
             logger.debug(f"To be scraped: {word}: {to_be_scraped_queue[word]}")
     
-        if len(to_be_scraped_queue) > 0:
-            with open(SCRAPE_QUEUE_FILE_NAME, 'w') as file:
-                logger.debug(f"Writing scrape entries")
-                json.dump(to_be_scraped_queue, file)
+        # Always replace the queue so an older interrupted run cannot be
+        # processed again when the current glossary is already complete.
+        with open(SCRAPE_QUEUE_FILE_NAME, 'w') as file:
+            logger.debug(f"Writing scrape entries")
+            json.dump(to_be_scraped_queue, file)
+
+    @staticmethod
+    def _load_dumped_words():
+        try:
+            with open(DUMP_FILE_NAME, 'r') as file:
+                dump_entries = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return set()
+
+        return {
+            entry["word"].strip().casefold()
+            for entry in dump_entries
+            if isinstance(entry, dict) and isinstance(entry.get("word"), str)
+        }
         
     def _fetch_glossary(self, fetch_from_google_sheet=False):
         # 1. Fetch from dump file first.
@@ -328,6 +496,10 @@ class Compiler:
                 continue
 
             entry = scraped_entries[word]
+            if entry.get("incorrect", False):
+                logger.warning(f"Skipping failed entry {word} in Google Sheets update")
+                continue
+
             cell_value = entry["translation"]
 
             logger.debug(f"Batch update writing {word} in {row_index - 1} with {cell_value}")
@@ -351,7 +523,18 @@ def _delete_file(file_name):
     except Exception as e:
         logger.error(f"An error occurred: {e}")
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    argument_parser = argparse.ArgumentParser()
+    argument_parser.add_argument(
+        "--backfill-grammar",
+        action="store_true",
+        help="Refresh grammar for all existing DWDS scrape files without DeepL")
+    args = argument_parser.parse_args()
+
+    if args.backfill_grammar:
+        Compiler.backfill_existing_grammar()
+        exit(0)
+
     api_key = None
     # Check if the environment variable exists
     if DEEPL_KEY_VAR in os.environ:

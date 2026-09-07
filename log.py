@@ -2,7 +2,7 @@ import functools
 import logging
 
 logging.basicConfig(
-    level=logging.INFO,  # Set the global logging level
+    level=logging.DEBUG,  # Set the global logging level
     format='[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d] %(message)s'
     # handlers=[
     #     logging.FileHandler('logfile.log'),  # Specify the file name for logging
